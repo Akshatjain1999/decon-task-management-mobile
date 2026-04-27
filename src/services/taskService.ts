@@ -91,7 +91,7 @@ export const taskService = {
       // React Native's XHR will append the multipart boundary when it sees this header.
       // transformRequest bypasses Axios's default JSON.stringify so FormData is sent as-is.
       headers: { 'Content-Type': 'multipart/form-data' },
-      transformRequest: (data) => data,
+      transformRequest: [(data) => data],
       timeout: 60000,
     })
     return res.data

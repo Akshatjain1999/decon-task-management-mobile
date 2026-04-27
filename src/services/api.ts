@@ -31,6 +31,13 @@ api.interceptors.response.use(
       await AsyncStorage.removeItem('auth_token')
       await AsyncStorage.removeItem('auth_user')
     }
+    // Debug: log full error details to Metro console
+    console.error('[API ERROR]', {
+      status: error.response?.status,
+      data: JSON.stringify(error.response?.data),
+      message: error.message,
+      code: error.code,
+    })
     const message: string =
       error.response?.data?.message ?? error.message ?? 'An unexpected error occurred'
     return Promise.reject(new Error(message))
