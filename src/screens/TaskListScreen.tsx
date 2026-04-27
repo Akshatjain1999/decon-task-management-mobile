@@ -83,7 +83,7 @@ export default function TaskListScreen() {
 
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
-      {/* Filter tabs */
+      {/* Filter tabs */}
       <FlatList
         horizontal
         data={FILTER_TABS}
