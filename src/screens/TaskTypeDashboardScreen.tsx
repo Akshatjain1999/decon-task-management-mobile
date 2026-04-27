@@ -11,7 +11,8 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { useNavigation, useRoute, type RouteProp } from '@react-navigation/native'
 import { dashboardService } from '../services/dashboardService'
-import type { TaskTypeDashboard, PipelineTaskItem } from '../types'
+import { taskService } from '../services/taskService'
+import type { TaskTypeDashboard, PipelineTaskItem, Task } from '../types'
 import type { RootStackParamList } from '../navigation/types'
 
 type Route = RouteProp<RootStackParamList, 'TaskTypeDashboard'>
@@ -104,6 +105,40 @@ export default function TaskTypeDashboardScreen() {
   const [loading, setLoading] = useState(true)
   const [refreshing, setRefreshing] = useState(false)
 
+  // KPI expand
+  const [expandedKpi, setExpandedKpi] = useState<string | null>(null)
+  const [allTasks, setAllTasks] = useState<Task[]>([])
+  const [kpiTasks, setKpiTasks] = useState<Task[]>([])
+  const [kpiLoading, setKpiLoading] = useState(false)
+
+  const KPI_FILTER: Record<string, (t: Task) => boolean> = {
+    ALL:         () => true,
+    COMPLETED:   (t) => t.status === 'COMPLETED',
+    IN_PROGRESS: (t) => t.status === 'IN_PROGRESS',
+    OPEN:        (t) => t.status === 'OPEN',
+    OVERDUE:     (t) => t.status === 'OVERDUE',
+  }
+
+  const handleKpiPress = async (filter: string) => {
+    if (expandedKpi === filter) { setExpandedKpi(null); return }
+    setExpandedKpi(filter)
+    if (allTasks.length > 0) {
+      setKpiTasks(allTasks.filter(KPI_FILTER[filter] ?? (() => true)))
+      return
+    }
+    setKpiLoading(true)
+    try {
+      const all = await taskService.getAll()
+      const typed = all.filter((t) => t.taskType === typeKey)
+      setAllTasks(typed)
+      setKpiTasks(typed.filter(KPI_FILTER[filter] ?? (() => true)))
+    } catch {
+      // ignore
+    } finally {
+      setKpiLoading(false)
+    }
+  }
+
   // pipeline accordion
   const [expandedStep, setExpandedStep] = useState<string | null>(null)
   const [stepTasks, setStepTasks] = useState<Record<string, PipelineTaskItem[]>>({})
@@ -183,20 +218,108 @@ export default function TaskTypeDashboardScreen() {
         <Text style={styles.sectionTitle}>KEY METRICS</Text>
         <View style={styles.kpiGrid}>
           {[
-            { label: 'Total Tasks',  value: data.totalTasks,       accent: '#041627' },
-            { label: 'Completed',    value: data.completedTasks,   accent: '#006a66' },
-            { label: 'In Progress',  value: data.inProgressTasks,  accent: '#180092' },
-            { label: 'Open',         value: data.openTasks,        accent: '#e0e3e5' },
-            { label: 'Overdue',      value: data.overdueTasks,     accent: '#ba1a1a' },
-            { label: 'Completion',   value: `${data.completionRate}%`, accent: meta.color },
-          ].map((c) => (
-            <View key={c.label} style={styles.kpiCard}>
-              <Text style={styles.kpiLabel}>{c.label}</Text>
-              <Text style={styles.kpiValue}>{c.value}</Text>
-              <View style={[styles.kpiAccent, { backgroundColor: c.accent }]} />
-            </View>
-          ))}
+            { label: 'Total Tasks',  value: data.totalTasks,           accent: '#041627', filter: 'ALL' },
+            { label: 'Completed',    value: data.completedTasks,       accent: '#006a66', filter: 'COMPLETED' },
+            { label: 'In Progress',  value: data.inProgressTasks,      accent: '#180092', filter: 'IN_PROGRESS' },
+            { label: 'Open',         value: data.openTasks,            accent: '#e0e3e5', filter: 'OPEN' },
+            { label: 'Overdue',      value: data.overdueTasks,         accent: '#ba1a1a', filter: 'OVERDUE' },
+            { label: 'Completion',   value: `${data.completionRate}%`, accent: meta.color, filter: null },
+          ].map((c) => {
+            const isActive = expandedKpi === c.filter
+            if (c.filter) {
+              return (
+                <TouchableOpacity
+                  key={c.label}
+                  onPress={() => handleKpiPress(c.filter!)}
+                  activeOpacity={0.75}
+                  style={[styles.kpiCard, isActive && { borderColor: meta.color, borderWidth: 1.5 }]}
+                >
+                  <View style={styles.kpiCardHeader}>
+                    <Text style={styles.kpiLabel}>{c.label}</Text>
+                    <Text style={[styles.kpiChevron, { color: isActive ? meta.color : '#d1d5db' }]}>
+                      {isActive ? '▲' : '▼'}
+                    </Text>
+                  </View>
+                  <Text style={styles.kpiValue}>{c.value}</Text>
+                  <View style={[styles.kpiAccent, { backgroundColor: c.accent }]} />
+                </TouchableOpacity>
+              )
+            }
+            return (
+              <View key={c.label} style={styles.kpiCard}>
+                <Text style={styles.kpiLabel}>{c.label}</Text>
+                <Text style={styles.kpiValue}>{c.value}</Text>
+                <View style={[styles.kpiAccent, { backgroundColor: c.accent }]} />
+              </View>
+            )
+          })}
         </View>
+
+        {/* ── Inline KPI task list ── */}
+        {expandedKpi && (
+          <View style={[styles.card, { padding: 0, marginBottom: 16 }]}>
+            {/* header */}
+            <View style={[styles.kpiTasksHeader, { borderBottomColor: '#eceef0' }]}>
+              <Text style={styles.kpiTasksHeaderText}>
+                {expandedKpi === 'ALL' ? 'All Tasks' :
+                 expandedKpi === 'COMPLETED' ? 'Completed Tasks' :
+                 expandedKpi === 'IN_PROGRESS' ? 'In Progress Tasks' :
+                 expandedKpi === 'OPEN' ? 'Open Tasks' : 'Overdue Tasks'}
+              </Text>
+              {!kpiLoading && (
+                <Text style={styles.kpiTasksCount}>({kpiTasks.length})</Text>
+              )}
+              <TouchableOpacity onPress={() => setExpandedKpi(null)} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+                <Text style={styles.kpiTasksClose}>✕</Text>
+              </TouchableOpacity>
+            </View>
+            {kpiLoading ? (
+              <View style={styles.kpiTasksLoading}>
+                <ActivityIndicator size="small" color={meta.color} />
+                <Text style={styles.kpiTasksLoadingText}>Loading tasks…</Text>
+              </View>
+            ) : kpiTasks.length === 0 ? (
+              <Text style={styles.emptyText}>No tasks found.</Text>
+            ) : (
+              kpiTasks.map((task, idx) => {
+                const sc = STATUS_COLORS[task.status] ?? { bg: '#e0e3e5', text: '#44474c' }
+                const pc = PRIORITY_COLORS[task.priority] ?? { bg: '#e0e3e5', text: '#44474c' }
+                const isOverdue = task.status !== 'COMPLETED' && task.dueDate && task.dueDate < new Date().toISOString()
+                return (
+                  <TouchableOpacity
+                    key={task.id}
+                    onPress={() => navigation.navigate('TaskDetail', { taskId: task.id })}
+                    activeOpacity={0.75}
+                    style={[styles.kpiTaskRow, idx === kpiTasks.length - 1 && { borderBottomWidth: 0 }]}
+                  >
+                    <Text style={styles.kpiTaskIdx}>{idx + 1}</Text>
+                    <View style={{ flex: 1 }}>
+                      <Text style={styles.kpiTaskTitle} numberOfLines={1}>{task.title}</Text>
+                      {task.assignedTo && (
+                        <Text style={styles.kpiTaskAssignee}>{task.assignedTo.name}</Text>
+                      )}
+                    </View>
+                    <View style={styles.kpiTaskBadges}>
+                      <View style={[styles.badge, { backgroundColor: pc.bg }]}>
+                        <Text style={[styles.badgeText, { color: pc.text }]}>{task.priority}</Text>
+                      </View>
+                      <View style={[styles.badge, { backgroundColor: sc.bg }]}>
+                        <Text style={[styles.badgeText, { color: sc.text }]}>{task.status.replace('_', ' ')}</Text>
+                      </View>
+                      {task.subtasksTotal > 0 && (
+                        <Text style={styles.kpiTaskSubtasks}>{task.subtasksCompleted}/{task.subtasksTotal}</Text>
+                      )}
+                    </View>
+                    <Text style={[styles.kpiTaskDue, isOverdue ? { color: '#ba1a1a' } : {}]}>
+                      {task.dueDate ? new Date(task.dueDate).toLocaleDateString('en', { month: 'short', day: 'numeric' }) : ''}
+                    </Text>
+                    <Text style={[styles.kpiTaskArrow, { color: meta.color }]}>›</Text>
+                  </TouchableOpacity>
+                )
+              })
+            )}
+          </View>
+        )}
 
         {/* ── Subtask Health + Priority ── */}
         <View style={styles.healthRow}>
@@ -442,9 +565,35 @@ const styles = StyleSheet.create({
     shadowColor: '#041627', shadowOpacity: 0.06, shadowRadius: 10, shadowOffset: { width: 0, height: 4 },
     elevation: 2, borderWidth: 1, borderColor: '#eceef0',
   },
-  kpiLabel: { fontSize: 9, fontWeight: '700', letterSpacing: 1.2, color: '#44474c', textTransform: 'uppercase', marginBottom: 6 },
+  kpiCardHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 },
+  kpiChevron: { fontSize: 9, fontWeight: '700' },
+  kpiLabel: { fontSize: 9, fontWeight: '700', letterSpacing: 1.2, color: '#44474c', textTransform: 'uppercase' },
   kpiValue: { fontSize: 28, fontWeight: '800', color: '#041627', lineHeight: 32 },
   kpiAccent: { marginTop: 8, height: 3, borderRadius: 2 },
+
+  kpiTasksHeader: {
+    flexDirection: 'row', alignItems: 'center', gap: 6,
+    paddingHorizontal: 14, paddingVertical: 10,
+    borderBottomWidth: 1, backgroundColor: '#f7f9fb',
+    borderTopLeftRadius: 16, borderTopRightRadius: 16,
+  },
+  kpiTasksHeaderText: { fontSize: 10, fontWeight: '700', letterSpacing: 1, color: '#44474c', textTransform: 'uppercase', flex: 1 },
+  kpiTasksCount: { fontSize: 10, color: '#9aa0a6' },
+  kpiTasksClose: { fontSize: 13, color: '#44474c', fontWeight: '700' },
+  kpiTasksLoading: { flexDirection: 'row', alignItems: 'center', gap: 8, padding: 14 },
+  kpiTasksLoadingText: { fontSize: 12, color: '#44474c' },
+  kpiTaskRow: {
+    flexDirection: 'row', alignItems: 'center', gap: 8,
+    paddingHorizontal: 14, paddingVertical: 10,
+    borderBottomWidth: 1, borderBottomColor: '#eceef0',
+  },
+  kpiTaskIdx: { fontSize: 10, color: '#9aa0a6', fontWeight: '600', width: 18 },
+  kpiTaskTitle: { fontSize: 12, fontWeight: '600', color: '#041627' },
+  kpiTaskAssignee: { fontSize: 10, color: '#44474c', marginTop: 1 },
+  kpiTaskBadges: { flexDirection: 'row', gap: 4, alignItems: 'center', flexShrink: 0 },
+  kpiTaskSubtasks: { fontSize: 9, color: '#9aa0a6', marginLeft: 2 },
+  kpiTaskDue: { fontSize: 9, color: '#44474c', flexShrink: 0, width: 44, textAlign: 'right' },
+  kpiTaskArrow: { fontSize: 18, fontWeight: '300', flexShrink: 0 },
 
   healthRow: { marginBottom: 12 },
   healthCard: {
