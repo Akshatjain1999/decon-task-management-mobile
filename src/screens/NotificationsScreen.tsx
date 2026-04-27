@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useCallback } from 'react'
+import React, { useEffect, useCallback } from 'react'
 import {
   View,
   Text,
@@ -8,7 +8,8 @@ import {
   RefreshControl,
   ActivityIndicator,
 } from 'react-native'
-import { notificationService } from '../services/notificationService'
+import { useAppDispatch, useAppSelector } from '../store/hooks'
+import { fetchNotifications, markRead, markAllRead } from '../store/notificationSlice'
 import type { Notification, NotificationType } from '../types'
 
 const TYPE_ICON: Record<NotificationType, string> = {
@@ -56,46 +57,26 @@ function NotificationItem({
 }
 
 export default function NotificationsScreen() {
-  const [notifications, setNotifications] = useState<Notification[]>([])
-  const [loading, setLoading] = useState(true)
+  const dispatch = useAppDispatch()
+  const { notifications, unreadCount, loading } = useAppSelector((s) => s.notifications)
 
-  const load = useCallback(async () => {
-    setLoading(true)
-    try {
-      const data = await notificationService.getMyNotifications()
-      setNotifications(data)
-    } finally {
-      setLoading(false)
-    }
-  }, [])
-
+  const load = useCallback(() => { dispatch(fetchNotifications()) }, [dispatch])
   useEffect(() => { load() }, [load])
 
-  const markRead = async (id: number) => {
-    await notificationService.markAsRead(id)
-    setNotifications((prev) =>
-      prev.map((n) => (n.id === id ? { ...n, isRead: true } : n)),
-    )
-  }
-
-  const markAllRead = async () => {
-    await notificationService.markAllAsRead()
-    setNotifications((prev) => prev.map((n) => ({ ...n, isRead: true })))
-  }
-
-  const unreadCount = notifications.filter((n) => !n.isRead).length
+  const handleMarkRead = (id: number) => { dispatch(markRead(id)) }
+  const handleMarkAllRead = () => { dispatch(markAllRead()) }
 
   return (
     <View style={styles.container}>
       {unreadCount > 0 && (
-        <TouchableOpacity style={styles.markAllBtn} onPress={markAllRead}>
+        <TouchableOpacity style={styles.markAllBtn} onPress={handleMarkAllRead}>
           <Text style={styles.markAllText}>Mark all as read ({unreadCount})</Text>
         </TouchableOpacity>
       )}
       <FlatList
         data={notifications}
         keyExtractor={(n) => String(n.id)}
-        renderItem={({ item }) => <NotificationItem item={item} onRead={markRead} />}
+        renderItem={({ item }) => <NotificationItem item={item} onRead={handleMarkRead} />}
         refreshControl={<RefreshControl refreshing={loading} onRefresh={load} />}
         ListEmptyComponent={
           loading ? (

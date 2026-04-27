@@ -36,6 +36,17 @@ export const updateTask = createAsyncThunk(
   },
 )
 
+export const createTask = createAsyncThunk(
+  'tasks/create',
+  async (data: import('../types').CreateTaskRequest, { rejectWithValue }) => {
+    try {
+      return await taskService.create(data)
+    } catch (e: any) {
+      return rejectWithValue(e.message)
+    }
+  },
+)
+
 const taskSlice = createSlice({
   name: 'tasks',
   initialState,
@@ -57,6 +68,9 @@ const taskSlice = createSlice({
       .addCase(updateTask.fulfilled, (state, action: PayloadAction<Task>) => {
         const idx = state.tasks.findIndex((t) => t.id === action.payload.id)
         if (idx !== -1) state.tasks[idx] = action.payload
+      })
+      .addCase(createTask.fulfilled, (state, action: PayloadAction<Task>) => {
+        state.tasks.unshift(action.payload)
       })
   },
 })

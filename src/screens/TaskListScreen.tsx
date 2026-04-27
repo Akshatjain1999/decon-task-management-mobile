@@ -1,4 +1,4 @@
-import React, { useEffect, useCallback } from 'react'
+import React, { useEffect, useCallback, useState } from 'react'
 import {
   View,
   Text,
@@ -29,7 +29,9 @@ const PRIORITY_COLORS: Record<string, string> = {
   CRITICAL: '#9c27b0',
 }
 
-type Nav = NativeStackNavigationProp<RootStackParamList, 'TaskList'>
+const FILTER_TABS: Array<TaskStatus | 'ALL'> = ['ALL', 'OPEN', 'IN_PROGRESS', 'COMPLETED', 'OVERDUE']
+
+type Nav = NativeStackNavigationProp<RootStackParamList>
 
 function TaskCard({ task }: { task: Task }) {
   const navigation = useNavigation<Nav>()
@@ -61,11 +63,14 @@ function TaskCard({ task }: { task: Task }) {
 
 export default function TaskListScreen() {
   const dispatch = useAppDispatch()
+  const navigation = useNavigation<Nav>()
   const { tasks, loading } = useAppSelector((s) => s.tasks)
+  const [filter, setFilter] = useState<TaskStatus | 'ALL'>('ALL')
 
   const load = useCallback(() => { dispatch(fetchTasks()) }, [dispatch])
-
   useEffect(() => { load() }, [load])
+
+  const filtered = filter === 'ALL' ? tasks : tasks.filter((t) => t.status === filter)
 
   if (loading && tasks.length === 0) {
     return (
@@ -76,22 +81,62 @@ export default function TaskListScreen() {
   }
 
   return (
-    <FlatList
-      style={styles.list}
-      contentContainerStyle={styles.content}
-      data={tasks}
-      keyExtractor={(t) => String(t.id)}
-      renderItem={({ item }) => <TaskCard task={item} />}
-      refreshControl={<RefreshControl refreshing={loading} onRefresh={load} />}
-      ListEmptyComponent={<Text style={styles.empty}>No tasks found.</Text>}
-    />
+    <View style={styles.container}>
+      {/* Filter tabs */}
+      <FlatList
+        horizontal
+        data={FILTER_TABS}
+        keyExtractor={(s) => s}
+        showsHorizontalScrollIndicator={false}
+        contentContainerStyle={styles.filterRow}
+        renderItem={({ item: tab }) => (
+          <TouchableOpacity
+            style={[styles.filterTab, filter === tab && styles.filterTabActive]}
+            onPress={() => setFilter(tab)}
+          >
+            <Text style={[styles.filterTabText, filter === tab && styles.filterTabTextActive]}>
+              {tab === 'ALL' ? 'All' : tab.replace('_', ' ')}
+            </Text>
+          </TouchableOpacity>
+        )}
+      />
+
+      {/* Task list */}
+      <FlatList
+        style={styles.list}
+        contentContainerStyle={styles.content}
+        data={filtered}
+        keyExtractor={(t) => String(t.id)}
+        renderItem={({ item }) => <TaskCard task={item} />}
+        refreshControl={<RefreshControl refreshing={loading} onRefresh={load} />}
+        ListEmptyComponent={<Text style={styles.empty}>No tasks found.</Text>}
+      />
+
+      {/* FAB */}
+      <TouchableOpacity style={styles.fab} onPress={() => navigation.navigate('CreateTask')}>
+        <Text style={styles.fabText}>+</Text>
+      </TouchableOpacity>
+    </View>
   )
 }
 
 const styles = StyleSheet.create({
-  list: { flex: 1, backgroundColor: '#f0f4ff' },
-  content: { padding: 16, gap: 12 },
+  container: { flex: 1, backgroundColor: '#f0f4ff' },
+  list: { flex: 1 },
+  content: { padding: 16, gap: 12, paddingBottom: 80 },
   center: { flex: 1, justifyContent: 'center', alignItems: 'center' },
+  filterRow: { paddingHorizontal: 12, paddingVertical: 10, gap: 8 },
+  filterTab: {
+    paddingHorizontal: 14,
+    paddingVertical: 7,
+    borderRadius: 20,
+    backgroundColor: '#fff',
+    borderWidth: 1.5,
+    borderColor: '#c5cae9',
+  },
+  filterTabActive: { backgroundColor: '#1a237e', borderColor: '#1a237e' },
+  filterTabText: { fontSize: 12, fontWeight: '600', color: '#555' },
+  filterTabTextActive: { color: '#fff' },
   card: {
     backgroundColor: '#fff',
     borderRadius: 12,
@@ -108,32 +153,28 @@ const styles = StyleSheet.create({
     gap: 8,
     marginBottom: 8,
   },
-  taskTitle: {
-    flex: 1,
-    fontSize: 15,
-    fontWeight: '600',
-    color: '#111',
-  },
-  badge: {
-    borderRadius: 6,
-    paddingHorizontal: 8,
-    paddingVertical: 3,
-  },
-  badgeText: {
-    fontSize: 11,
-    fontWeight: '600',
-  },
-  cardMeta: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-  },
-  priorityDot: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-  },
+  taskTitle: { flex: 1, fontSize: 15, fontWeight: '600', color: '#111' },
+  badge: { borderRadius: 6, paddingHorizontal: 8, paddingVertical: 3 },
+  badgeText: { fontSize: 11, fontWeight: '600' },
+  cardMeta: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  priorityDot: { width: 8, height: 8, borderRadius: 4 },
   metaText: { fontSize: 12, color: '#666' },
   assignee: { fontSize: 12, color: '#555', marginTop: 6 },
   empty: { textAlign: 'center', color: '#999', marginTop: 60 },
+  fab: {
+    position: 'absolute',
+    bottom: 20,
+    right: 20,
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    backgroundColor: '#1a237e',
+    justifyContent: 'center',
+    alignItems: 'center',
+    elevation: 6,
+    shadowColor: '#000',
+    shadowOpacity: 0.2,
+    shadowRadius: 6,
+  },
+  fabText: { color: '#fff', fontSize: 28, lineHeight: 32, fontWeight: '300' },
 })

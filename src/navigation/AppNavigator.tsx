@@ -3,6 +3,7 @@ import { createNativeStackNavigator } from '@react-navigation/native-stack'
 import { useAppSelector } from '../store/hooks'
 import LoginScreen from '../screens/LoginScreen'
 import TaskDetailScreen from '../screens/TaskDetailScreen'
+import CreateTaskScreen from '../screens/CreateTaskScreen'
 import BottomTabs from './BottomTabs'
 import type { RootStackParamList } from './types'
 
@@ -30,6 +31,11 @@ export default function AppNavigator() {
             name="TaskDetail"
             component={TaskDetailScreen}
             options={{ title: 'Task Details' }}
+          />
+          <Stack.Screen
+            name="CreateTask"
+            component={CreateTaskScreen}
+            options={{ title: 'New Task' }}
           />
         </>
       ) : (
