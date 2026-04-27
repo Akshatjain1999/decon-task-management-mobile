@@ -70,7 +70,7 @@ export default function CreateTaskScreen() {
       if (createTask.fulfilled.match(result)) {
         navigation.goBack()
       } else {
-        Alert.alert('Error', 'Failed to create task. Please try again.')
+        Alert.alert('Error', (result.payload as string) || result.error?.message || 'Failed to create task')
       }
     } finally {
       setLoading(false)

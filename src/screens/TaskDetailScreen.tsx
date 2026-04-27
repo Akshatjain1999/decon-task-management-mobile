@@ -113,8 +113,8 @@ export default function TaskDetailScreen({ route, navigation }: Props) {
     try {
       const data = await taskService.getById(taskId)
       setTask(data)
-    } catch {
-      Alert.alert('Error', 'Failed to load task')
+    } catch (e: any) {
+      Alert.alert('Error', e?.message || 'Failed to load task')
     } finally {
       setLoading(false)
     }
@@ -128,8 +128,8 @@ export default function TaskDetailScreen({ route, navigation }: Props) {
     try {
       const data = await taskService.getAudits(taskId)
       setAudits(data)
-    } catch {
-      Alert.alert('Error', 'Failed to load activity')
+    } catch (e: any) {
+      Alert.alert('Error', e?.message || 'Failed to load activity')
     } finally {
       setAuditsLoading(false)
     }
@@ -147,8 +147,8 @@ export default function TaskDetailScreen({ route, navigation }: Props) {
       const updated = await taskService.update(taskId, { status: newStatus })
       setTask(updated)
       dispatch(updateTask({ id: taskId, data: { status: newStatus } }))
-    } catch {
-      Alert.alert('Error', 'Failed to update status')
+    } catch (e: any) {
+      Alert.alert('Error', e?.message || 'Failed to update status')
     } finally {
       setUpdatingStatus(false)
     }
@@ -184,8 +184,8 @@ export default function TaskDetailScreen({ route, navigation }: Props) {
               await taskService.delete(taskId)
               dispatch(fetchTasks())
               navigation.goBack()
-            } catch {
-              Alert.alert('Error', 'Failed to delete task')
+            } catch (e: any) {
+              Alert.alert('Error', e?.message || 'Failed to delete task')
             }
           },
         },
@@ -201,8 +201,8 @@ export default function TaskDetailScreen({ route, navigation }: Props) {
       const comment = await taskService.addComment(task.id, commentText.trim())
       setTask((prev) => prev ? { ...prev, comments: [...(prev.comments || []), comment], commentsCount: prev.commentsCount + 1 } : prev)
       setCommentText('')
-    } catch {
-      Alert.alert('Error', 'Failed to post comment')
+    } catch (e: any) {
+      Alert.alert('Error', e?.message || 'Failed to post comment')
     } finally {
       setSubmittingComment(false)
     }
@@ -218,8 +218,8 @@ export default function TaskDetailScreen({ route, navigation }: Props) {
           try {
             await taskService.deleteComment(task.id, commentId)
             setTask((prev) => prev ? { ...prev, comments: prev.comments.filter((c) => c.id !== commentId), commentsCount: prev.commentsCount - 1 } : prev)
-          } catch {
-            Alert.alert('Error', 'Failed to delete comment')
+          } catch (e: any) {
+            Alert.alert('Error', e?.message || 'Failed to delete comment')
           }
         },
       },
@@ -248,8 +248,8 @@ export default function TaskDetailScreen({ route, navigation }: Props) {
                 )
                 return { ...prev, subtasks, subtasksCompleted: subtasks.filter((st) => st.isComplete).length }
               })
-            } catch {
-              Alert.alert('Error', 'Failed to update status')
+            } catch (e: any) {
+              Alert.alert('Error', e?.message || 'Failed to update status')
             } finally {
               setSettingStatusId(null)
             }
@@ -271,8 +271,8 @@ export default function TaskDetailScreen({ route, navigation }: Props) {
     try {
       const notes = await taskService.getSubtaskNotes(subtaskId)
       setSubtaskNotes((prev) => ({ ...prev, [subtaskId]: notes }))
-    } catch {
-      Alert.alert('Error', 'Failed to load notes')
+    } catch (e: any) {
+      Alert.alert('Error', e?.message || 'Failed to load notes')
     } finally {
       setNotesLoading((prev) => ({ ...prev, [subtaskId]: false }))
     }
@@ -286,8 +286,8 @@ export default function TaskDetailScreen({ route, navigation }: Props) {
       const note = await taskService.addSubtaskNote(subtaskId, text)
       setSubtaskNotes((prev) => ({ ...prev, [subtaskId]: [...(prev[subtaskId] || []), note] }))
       setNoteText((prev) => ({ ...prev, [subtaskId]: '' }))
-    } catch {
-      Alert.alert('Error', 'Failed to add note')
+    } catch (e: any) {
+      Alert.alert('Error', e?.message || 'Failed to add note')
     } finally {
       setSubmittingNote(null)
     }
@@ -302,8 +302,8 @@ export default function TaskDetailScreen({ route, navigation }: Props) {
           try {
             await taskService.deleteSubtaskNote(noteId)
             setSubtaskNotes((prev) => ({ ...prev, [subtaskId]: prev[subtaskId].filter((n) => n.id !== noteId) }))
-          } catch {
-            Alert.alert('Error', 'Failed to delete note')
+          } catch (e: any) {
+            Alert.alert('Error', e?.message || 'Failed to delete note')
           }
         },
       },
@@ -320,8 +320,8 @@ export default function TaskDetailScreen({ route, navigation }: Props) {
         const subtasks = prev.subtasks.map((s) => s.id === subtaskId ? { ...s, isComplete: updated.isComplete, status: updated.status } : s)
         return { ...prev, subtasks, subtasksCompleted: subtasks.filter((s) => s.isComplete).length }
       })
-    } catch {
-      Alert.alert('Error', 'Failed to toggle subtask')
+    } catch (e: any) {
+      Alert.alert('Error', e?.message || 'Failed to toggle subtask')
     } finally {
       setTogglingSubtaskId(null)
     }
@@ -334,8 +334,8 @@ export default function TaskDetailScreen({ route, navigation }: Props) {
       const subtask = await taskService.createSubtask(task.id, newSubtask.trim())
       setTask((prev) => prev ? { ...prev, subtasks: [...prev.subtasks, subtask], subtasksTotal: prev.subtasksTotal + 1 } : prev)
       setNewSubtask('')
-    } catch {
-      Alert.alert('Error', 'Failed to add subtask')
+    } catch (e: any) {
+      Alert.alert('Error', e?.message || 'Failed to add subtask')
     } finally {
       setAddingSubtask(false)
     }
@@ -351,8 +351,8 @@ export default function TaskDetailScreen({ route, navigation }: Props) {
           try {
             await taskService.deleteSubtask(task.id, subtaskId)
             setTask((prev) => prev ? { ...prev, subtasks: prev.subtasks.filter((s) => s.id !== subtaskId), subtasksTotal: prev.subtasksTotal - 1 } : prev)
-          } catch {
-            Alert.alert('Error', 'Failed to delete subtask')
+          } catch (e: any) {
+            Alert.alert('Error', e?.message || 'Failed to delete subtask')
           }
         },
       },
