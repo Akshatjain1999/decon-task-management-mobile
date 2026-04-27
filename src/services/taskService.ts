@@ -1,5 +1,5 @@
 import api from './api'
-import type { Task, CreateTaskRequest, UpdateTaskRequest } from '../types'
+import type { Task, CreateTaskRequest, UpdateTaskRequest, Comment, TaskAuditsResponse, Subtask } from '../types'
 
 export const taskService = {
   async getAll(): Promise<Task[]> {
@@ -28,6 +28,49 @@ export const taskService = {
 
   async getMyTasks(userId: number): Promise<Task[]> {
     const res = await api.get<Task[]>(`/api/v1/tasks/assignee/${userId}`)
+    return res.data
+  },
+
+  // ── Comments ────────────────────────────────────────────────────────────
+  async getComments(taskId: number): Promise<Comment[]> {
+    const res = await api.get<Comment[]>(`/api/v1/tasks/${taskId}/comments`)
+    return res.data
+  },
+
+  async addComment(taskId: number, content: string): Promise<Comment> {
+    const res = await api.post<Comment>(`/api/v1/tasks/${taskId}/comments`, { content })
+    return res.data
+  },
+
+  async deleteComment(taskId: number, commentId: number): Promise<void> {
+    await api.delete(`/api/v1/tasks/${taskId}/comments/${commentId}`)
+  },
+
+  // ── Subtasks ────────────────────────────────────────────────────────────
+  async createSubtask(taskId: number, title: string): Promise<Subtask> {
+    const res = await api.post<Subtask>(`/api/v1/tasks/${taskId}/subtasks`, { title })
+    return res.data
+  },
+
+  async toggleSubtask(taskId: number, subtaskId: number): Promise<Subtask> {
+    const res = await api.put<Subtask>(`/api/v1/tasks/${taskId}/subtasks/${subtaskId}/toggle`)
+    return res.data
+  },
+
+  async setSubtaskStatus(taskId: number, subtaskId: number, status: string): Promise<Subtask> {
+    const res = await api.patch<Subtask>(
+      `/api/v1/tasks/${taskId}/subtasks/${subtaskId}/status?status=${status}`,
+    )
+    return res.data
+  },
+
+  async deleteSubtask(taskId: number, subtaskId: number): Promise<void> {
+    await api.delete(`/api/v1/tasks/${taskId}/subtasks/${subtaskId}`)
+  },
+
+  // ── Audits ──────────────────────────────────────────────────────────────
+  async getAudits(taskId: number): Promise<TaskAuditsResponse> {
+    const res = await api.get<TaskAuditsResponse>(`/api/v1/tasks/${taskId}/audits`)
     return res.data
   },
 }

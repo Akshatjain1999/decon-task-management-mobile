@@ -64,6 +64,8 @@ export interface Task {
   categoryName: string | null
   tags: Tag[]
   subtasks: Subtask[]
+  comments: Comment[]
+  attachments: Attachment[]
   commentsCount: number
   subtasksTotal: number
   subtasksCompleted: number
@@ -85,6 +87,52 @@ export interface UpdateTaskRequest {
   status?: TaskStatus
   assignedToId?: number
   dueDate?: string
+  estimateHours?: number
+}
+
+// ─── Comment ───────────────────────────────────────────────────────────────
+export interface Comment {
+  id: number
+  content: string
+  user: User
+  createdAt: string
+}
+
+// ─── Attachment ─────────────────────────────────────────────────────────────
+export interface Attachment {
+  id: number
+  fileName: string
+  fileType: string
+  fileSize: number
+  uploadedAt: string
+}
+
+// ─── Audit ──────────────────────────────────────────────────────────────────
+export interface TaskAuditEntry {
+  id: number
+  changeType: string
+  fieldChanged: string | null
+  oldValue: string | null
+  newValue: string | null
+  changedByName: string
+  changedAt: string
+}
+
+export interface SubtaskAuditEntry {
+  id: number
+  subtaskId: number
+  subtaskTitle: string
+  changeType: string
+  oldStatus: string | null
+  newStatus: string | null
+  backwardMove: boolean
+  changedByName: string
+  changedAt: string
+}
+
+export interface TaskAuditsResponse {
+  taskAudits: TaskAuditEntry[]
+  subtaskAudits: SubtaskAuditEntry[]
 }
 
 // ─── Notification ──────────────────────────────────────────────────────────
