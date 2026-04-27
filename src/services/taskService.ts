@@ -1,4 +1,5 @@
-import api from './api'
+import AsyncStorage from '@react-native-async-storage/async-storage'
+import api, { API_BASE_URL } from './api'
 import type { Task, CreateTaskRequest, UpdateTaskRequest, Comment, TaskAuditsResponse, Subtask, SubtaskNote } from '../types'
 
 export const taskService = {
@@ -79,24 +80,28 @@ export const taskService = {
     note: string,
     attachment?: { uri: string; name: string; type: string } | null,
   ): Promise<SubtaskNote> {
-    // Backend always expects multipart/form-data — never send JSON.
-    // Do NOT set Content-Type manually; Axios must auto-detect it so the
-    // multipart boundary is included correctly.
+    // Use native fetch instead of Axios — Axios's transformers break FormData in React Native.
+    // fetch() lets the native XHR layer set Content-Type: multipart/form-data; boundary=... automatically.
+    const token = await AsyncStorage.getItem('auth_token')
     const formData = new FormData()
     formData.append('note', note)
     if (attachment) {
       formData.append('attachment', { uri: attachment.uri, name: attachment.name, type: attachment.type } as any)
     }
-    const res = await api.post<SubtaskNote>(`/api/v1/subtasks/${subtaskId}/notes`, formData, {
-      // DO NOT set Content-Type — React Native XHR auto-sets multipart/form-data; boundary=...
-      // transformRequest deletes the instance-level application/json header and passes FormData raw.
-      transformRequest: [(data, headers) => {
-        if (headers) delete (headers as Record<string, unknown>)['Content-Type']
-        return data
-      }],
-      timeout: 60000,
+    const headers: Record<string, string> = {}
+    if (token) headers['Authorization'] = `Bearer ${token}`
+    // Do NOT set Content-Type — fetch sets multipart/form-data; boundary=... automatically
+    const response = await fetch(`${API_BASE_URL}/api/v1/subtasks/${subtaskId}/notes`, {
+      method: 'POST',
+      headers,
+      body: formData,
     })
-    return res.data
+    const json = await response.json()
+    if (!response.ok) {
+      throw new Error(json?.message || `Request failed with status ${response.status}`)
+    }
+    // Unwrap ApiResponse<T> envelope
+    return (json?.data ?? json) as SubtaskNote
   },
 
   async deleteSubtaskNote(noteId: number): Promise<void> {
