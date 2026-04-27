@@ -108,6 +108,11 @@ export const taskService = {
     await api.delete(`/api/v1/subtasks/notes/${noteId}`)
   },
 
+  async getAttachmentDownloadUrl(noteId: number): Promise<string> {
+    const token = await AsyncStorage.getItem('auth_token')
+    return `${API_BASE_URL}/api/v1/subtasks/notes/${noteId}/attachment?token=${encodeURIComponent(token ?? '')}`
+  },
+
   // ── Audits ──────────────────────────────────────────────────────────────
   async getAudits(taskId: number): Promise<TaskAuditsResponse> {
     const res = await api.get<TaskAuditsResponse>(`/api/v1/tasks/${taskId}/audits`)

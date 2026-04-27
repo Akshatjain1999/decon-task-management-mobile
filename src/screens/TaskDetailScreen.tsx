@@ -12,6 +12,8 @@ import {
   Platform,
 } from 'react-native'
 import * as DocumentPicker from 'expo-document-picker'
+import * as FileSystem from 'expo-file-system'
+import * as Sharing from 'expo-sharing'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import type { NativeStackScreenProps } from '@react-navigation/native-stack'
 import type { RootStackParamList } from '../navigation/types'
@@ -116,6 +118,21 @@ export default function TaskDetailScreen({ route, navigation }: Props) {
       }
     } catch (e: any) {
       Alert.alert('Error', e?.message || 'Could not pick file')
+    }
+  }
+
+  const handleOpenAttachment = async (noteId: number, fileName: string) => {
+    try {
+      const url = await taskService.getAttachmentDownloadUrl(noteId)
+      const localUri = FileSystem.cacheDirectory + fileName
+      const { uri } = await FileSystem.downloadAsync(url, localUri)
+      if (await Sharing.isAvailableAsync()) {
+        await Sharing.shareAsync(uri)
+      } else {
+        Alert.alert('Error', 'Sharing is not available on this device')
+      }
+    } catch (e: any) {
+      Alert.alert('Error', e?.message || 'Could not open attachment')
     }
   }
 
@@ -526,9 +543,12 @@ export default function TaskDetailScreen({ route, navigation }: Props) {
                             <Text style={styles.noteAuthor}>{n.createdBy?.name}</Text>
                             <Text style={styles.noteText}>{n.note}</Text>
                             {n.hasAttachment && n.attachmentName && (
-                              <View style={styles.attachmentChip}>
+                              <TouchableOpacity
+                                style={styles.attachmentChip}
+                                onPress={() => handleOpenAttachment(n.id, n.attachmentName!)}
+                              >
                                 <Text style={styles.attachmentChipText}>📎 {n.attachmentName}</Text>
-                              </View>
+                              </TouchableOpacity>
                             )}
                             <Text style={styles.noteMeta}>{timeAgo(n.createdAt)}</Text>
                           </View>
