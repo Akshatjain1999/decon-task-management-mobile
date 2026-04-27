@@ -79,16 +79,18 @@ export const taskService = {
     note: string,
     attachment?: { uri: string; name: string; type: string } | null,
   ): Promise<SubtaskNote> {
+    // Backend always expects multipart/form-data — never send JSON.
+    // Do NOT set Content-Type manually; Axios must auto-detect it so the
+    // multipart boundary is included correctly.
+    const formData = new FormData()
+    formData.append('note', note)
     if (attachment) {
-      const formData = new FormData()
-      formData.append('note', note)
       formData.append('attachment', { uri: attachment.uri, name: attachment.name, type: attachment.type } as any)
-      const res = await api.post<SubtaskNote>(`/api/v1/subtasks/${subtaskId}/notes`, formData, {
-        headers: { 'Content-Type': 'multipart/form-data' },
-      })
-      return res.data
     }
-    const res = await api.post<SubtaskNote>(`/api/v1/subtasks/${subtaskId}/notes`, { note })
+    const res = await api.post<SubtaskNote>(`/api/v1/subtasks/${subtaskId}/notes`, formData, {
+      headers: { 'Content-Type': undefined },
+      timeout: 60000,
+    })
     return res.data
   },
 
