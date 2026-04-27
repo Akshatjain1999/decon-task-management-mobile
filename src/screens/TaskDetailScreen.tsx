@@ -17,7 +17,7 @@ import type { RootStackParamList } from '../navigation/types'
 import { taskService } from '../services/taskService'
 import { useAppDispatch, useAppSelector } from '../store/hooks'
 import { updateTask, fetchTasks } from '../store/taskSlice'
-import type { Task, TaskStatus, Comment, TaskAuditsResponse, Subtask } from '../types'
+import type { Task, TaskStatus, Comment, TaskAuditsResponse, Subtask, SubtaskNote, SubtaskStatus } from '../types'
 
 type Props = NativeStackScreenProps<RootStackParamList, 'TaskDetail'>
 type Tab = 'details' | 'subtasks' | 'comments' | 'activity'
@@ -95,6 +95,12 @@ export default function TaskDetailScreen({ route, navigation }: Props) {
   const [newSubtask, setNewSubtask] = useState('')
   const [addingSubtask, setAddingSubtask] = useState(false)
   const [togglingSubtaskId, setTogglingSubtaskId] = useState<number | null>(null)
+  const [settingStatusId, setSettingStatusId] = useState<number | null>(null)
+  const [expandedSubtaskId, setExpandedSubtaskId] = useState<number | null>(null)
+  const [subtaskNotes, setSubtaskNotes] = useState<Record<number, SubtaskNote[]>>({})
+  const [notesLoading, setNotesLoading] = useState<Record<number, boolean>>({})
+  const [noteText, setNoteText] = useState<Record<number, string>>({})
+  const [submittingNote, setSubmittingNote] = useState<number | null>(null)
 
   // Audits
   const [audits, setAudits] = useState<TaskAuditsResponse | null>(null)
@@ -221,6 +227,89 @@ export default function TaskDetailScreen({ route, navigation }: Props) {
   }
 
   // ─── Subtasks ──────────────────────────────────────────────────────────
+  const handleSetSubtaskStatus = (subtaskId: number, currentStatus: SubtaskStatus) => {
+    if (!task) return
+    const statuses: SubtaskStatus[] = ['TODO', 'IN_PROGRESS', 'DONE']
+    Alert.alert(
+      'Set Status',
+      `Current: ${currentStatus.replace('_', ' ')}`,
+      [
+        ...statuses.map((s) => ({
+          text: s.replace('_', ' '),
+          style: (s === currentStatus ? 'default' : 'default') as 'default',
+          onPress: async () => {
+            setSettingStatusId(subtaskId)
+            try {
+              const updated = await taskService.setSubtaskStatus(task.id, subtaskId, s)
+              setTask((prev) => {
+                if (!prev) return prev
+                const subtasks = prev.subtasks.map((st) =>
+                  st.id === subtaskId ? { ...st, status: updated.status, isComplete: updated.isComplete } : st
+                )
+                return { ...prev, subtasks, subtasksCompleted: subtasks.filter((st) => st.isComplete).length }
+              })
+            } catch {
+              Alert.alert('Error', 'Failed to update status')
+            } finally {
+              setSettingStatusId(null)
+            }
+          },
+        })),
+        { text: 'Cancel', style: 'cancel' },
+      ],
+    )
+  }
+
+  const handleToggleNotes = async (subtaskId: number) => {
+    if (expandedSubtaskId === subtaskId) {
+      setExpandedSubtaskId(null)
+      return
+    }
+    setExpandedSubtaskId(subtaskId)
+    if (subtaskNotes[subtaskId]) return
+    setNotesLoading((prev) => ({ ...prev, [subtaskId]: true }))
+    try {
+      const notes = await taskService.getSubtaskNotes(subtaskId)
+      setSubtaskNotes((prev) => ({ ...prev, [subtaskId]: notes }))
+    } catch {
+      Alert.alert('Error', 'Failed to load notes')
+    } finally {
+      setNotesLoading((prev) => ({ ...prev, [subtaskId]: false }))
+    }
+  }
+
+  const handleAddSubtaskNote = async (subtaskId: number) => {
+    const text = noteText[subtaskId]?.trim()
+    if (!text) return
+    setSubmittingNote(subtaskId)
+    try {
+      const note = await taskService.addSubtaskNote(subtaskId, text)
+      setSubtaskNotes((prev) => ({ ...prev, [subtaskId]: [...(prev[subtaskId] || []), note] }))
+      setNoteText((prev) => ({ ...prev, [subtaskId]: '' }))
+    } catch {
+      Alert.alert('Error', 'Failed to add note')
+    } finally {
+      setSubmittingNote(null)
+    }
+  }
+
+  const handleDeleteSubtaskNote = (subtaskId: number, noteId: number) => {
+    Alert.alert('Delete Note', 'Remove this note?', [
+      { text: 'Cancel', style: 'cancel' },
+      {
+        text: 'Delete', style: 'destructive',
+        onPress: async () => {
+          try {
+            await taskService.deleteSubtaskNote(noteId)
+            setSubtaskNotes((prev) => ({ ...prev, [subtaskId]: prev[subtaskId].filter((n) => n.id !== noteId) }))
+          } catch {
+            Alert.alert('Error', 'Failed to delete note')
+          }
+        },
+      },
+    ])
+  }
+
   const handleToggleSubtask = async (subtaskId: number) => {
     if (!task) return
     setTogglingSubtaskId(subtaskId)
@@ -392,13 +481,65 @@ export default function TaskDetailScreen({ route, navigation }: Props) {
 
               {/* Subtask list */}
               {task.subtasks.map((sub) => (
-                <SubtaskRow
-                  key={sub.id}
-                  subtask={sub}
-                  toggling={togglingSubtaskId === sub.id}
-                  onToggle={() => handleToggleSubtask(sub.id)}
-                  onDelete={() => handleDeleteSubtask(sub.id)}
-                />
+                <View key={sub.id}>
+                  <SubtaskRow
+                    subtask={sub}
+                    toggling={togglingSubtaskId === sub.id}
+                    settingStatus={settingStatusId === sub.id}
+                    notesCount={subtaskNotes[sub.id]?.length ?? 0}
+                    expanded={expandedSubtaskId === sub.id}
+                    onToggle={() => handleToggleSubtask(sub.id)}
+                    onSetStatus={() => handleSetSubtaskStatus(sub.id, sub.status)}
+                    onToggleNotes={() => handleToggleNotes(sub.id)}
+                    onDelete={() => handleDeleteSubtask(sub.id)}
+                  />
+                  {expandedSubtaskId === sub.id && (
+                    <View style={styles.notesPanel}>
+                      {notesLoading[sub.id] && (
+                        <ActivityIndicator size="small" color="#1a237e" style={{ marginVertical: 8 }} />
+                      )}
+                      {(subtaskNotes[sub.id] || []).map((n) => (
+                        <View key={n.id} style={styles.noteRow}>
+                          <View style={styles.noteAvatar}>
+                            <Text style={styles.noteAvatarText}>{n.createdBy?.name?.charAt(0)?.toUpperCase() ?? '?'}</Text>
+                          </View>
+                          <View style={{ flex: 1 }}>
+                            <Text style={styles.noteAuthor}>{n.createdBy?.name}</Text>
+                            <Text style={styles.noteText}>{n.note}</Text>
+                            <Text style={styles.noteMeta}>{timeAgo(n.createdAt)}</Text>
+                          </View>
+                          {n.createdBy?.id === currentUser?.userId && (
+                            <TouchableOpacity onPress={() => handleDeleteSubtaskNote(sub.id, n.id)}>
+                              <Text style={{ color: '#ba1a1a', fontSize: 12 }}>Delete</Text>
+                            </TouchableOpacity>
+                          )}
+                        </View>
+                      ))}
+                      {!notesLoading[sub.id] && (subtaskNotes[sub.id] || []).length === 0 && (
+                        <Text style={styles.noteEmpty}>No notes yet.</Text>
+                      )}
+                      <View style={styles.addRow}>
+                        <TextInput
+                          style={styles.addInput}
+                          value={noteText[sub.id] ?? ''}
+                          onChangeText={(t) => setNoteText((prev) => ({ ...prev, [sub.id]: t }))}
+                          placeholder="Add a note…"
+                          placeholderTextColor="#aaa"
+                          multiline
+                        />
+                        <TouchableOpacity
+                          style={styles.addBtn}
+                          onPress={() => handleAddSubtaskNote(sub.id)}
+                          disabled={submittingNote === sub.id || !noteText[sub.id]?.trim()}
+                        >
+                          {submittingNote === sub.id
+                            ? <ActivityIndicator size="small" color="#fff" />
+                            : <Text style={styles.addBtnText}>Add</Text>}
+                        </TouchableOpacity>
+                      </View>
+                    </View>
+                  )}
+                </View>
               ))}
               {task.subtasks.length === 0 && (
                 <Text style={styles.empty}>No subtasks yet.</Text>
@@ -521,25 +662,50 @@ function MetaRow({ label, value }: { label: string; value: string }) {
   )
 }
 
-function SubtaskRow({ subtask, toggling, onToggle, onDelete }: {
+function SubtaskRow({ subtask, toggling, settingStatus, notesCount, expanded, onToggle, onSetStatus, onToggleNotes, onDelete }: {
   subtask: Subtask
   toggling: boolean
+  settingStatus: boolean
+  notesCount: number
+  expanded: boolean
   onToggle: () => void
+  onSetStatus: () => void
+  onToggleNotes: () => void
   onDelete: () => void
 }) {
   return (
-    <View style={styles.subtaskRow}>
+    <View style={[styles.subtaskRow, expanded && styles.subtaskRowExpanded]}>
+      {/* Checkbox */}
       <TouchableOpacity onPress={onToggle} disabled={toggling} style={styles.subtaskCheck}>
         {toggling
           ? <ActivityIndicator size="small" color="#1a237e" />
           : <Text style={{ fontSize: 18 }}>{subtask.isComplete ? '✅' : '⬜'}</Text>}
       </TouchableOpacity>
+
+      {/* Title + status chip row */}
       <View style={styles.subtaskBody}>
         <Text style={[styles.subtaskTitle, subtask.isComplete && styles.strikethrough]}>{subtask.title}</Text>
-        <Text style={[styles.subtaskStatus, { color: SUBTASK_STATUS_COLORS[subtask.status] ?? '#666' }]}>
-          {subtask.status.replace('_', ' ')}
-        </Text>
+        <View style={styles.subtaskActions}>
+          {/* Status chip — tap to change */}
+          <TouchableOpacity
+            onPress={onSetStatus}
+            disabled={settingStatus}
+            style={[styles.statusChip, { backgroundColor: (SUBTASK_STATUS_COLORS[subtask.status] ?? '#666') + '22' }]}
+          >
+            {settingStatus
+              ? <ActivityIndicator size="small" color={SUBTASK_STATUS_COLORS[subtask.status] ?? '#666'} />
+              : <Text style={[styles.statusChipText, { color: SUBTASK_STATUS_COLORS[subtask.status] ?? '#666' }]}>
+                  {subtask.status.replace('_', ' ')}
+                </Text>}
+          </TouchableOpacity>
+          {/* Notes toggle */}
+          <TouchableOpacity onPress={onToggleNotes} style={styles.notesBtn}>
+            <Text style={styles.notesBtnText}>{expanded ? '▲' : '🗒️'} Notes{notesCount > 0 ? ` (${notesCount})` : ''}</Text>
+          </TouchableOpacity>
+        </View>
       </View>
+
+      {/* Delete */}
       <TouchableOpacity onPress={onDelete} style={styles.subtaskDel}>
         <Text style={{ color: '#ba1a1a', fontSize: 16 }}>✕</Text>
       </TouchableOpacity>
@@ -648,10 +814,33 @@ const styles = StyleSheet.create({
   },
   subtaskCheck: { marginRight: 10 },
   subtaskBody: { flex: 1 },
-  subtaskTitle: { fontSize: 14, color: '#222', fontWeight: '500' },
+  subtaskTitle: { fontSize: 14, color: '#222', fontWeight: '500', marginBottom: 4 },
+  subtaskRowExpanded: { borderBottomLeftRadius: 0, borderBottomRightRadius: 0, marginBottom: 0 },
+  subtaskActions: { flexDirection: 'row', alignItems: 'center', gap: 8, flexWrap: 'wrap' },
+  statusChip: { borderRadius: 6, paddingHorizontal: 8, paddingVertical: 3, minWidth: 40 },
+  statusChipText: { fontSize: 11, fontWeight: '700' },
+  notesBtn: { paddingHorizontal: 6, paddingVertical: 3, borderRadius: 6, backgroundColor: '#f0f4ff' },
+  notesBtnText: { fontSize: 11, color: '#1a237e', fontWeight: '600' },
   strikethrough: { textDecorationLine: 'line-through', color: '#aaa' },
   subtaskStatus: { fontSize: 11, fontWeight: '600', marginTop: 2 },
   subtaskDel: { padding: 4 },
+
+  // Notes panel
+  notesPanel: {
+    backgroundColor: '#f7f9ff', borderWidth: 1, borderTopWidth: 0,
+    borderColor: '#e0e0e0', borderBottomLeftRadius: 10, borderBottomRightRadius: 10,
+    padding: 12, marginBottom: 8,
+  },
+  noteRow: { flexDirection: 'row', gap: 8, marginBottom: 10, alignItems: 'flex-start' },
+  noteAvatar: {
+    width: 26, height: 26, borderRadius: 13,
+    backgroundColor: '#1a237e', justifyContent: 'center', alignItems: 'center', flexShrink: 0,
+  },
+  noteAvatarText: { color: '#fff', fontWeight: '700', fontSize: 11 },
+  noteAuthor: { fontSize: 12, fontWeight: '700', color: '#222' },
+  noteText: { fontSize: 13, color: '#333', marginTop: 1 },
+  noteMeta: { fontSize: 10, color: '#aaa', marginTop: 2 },
+  noteEmpty: { fontSize: 12, color: '#aaa', textAlign: 'center', marginVertical: 8 },
 
   // Add row
   addRow: { flexDirection: 'row', gap: 8, marginTop: 8 },

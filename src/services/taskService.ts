@@ -1,5 +1,5 @@
 import api from './api'
-import type { Task, CreateTaskRequest, UpdateTaskRequest, Comment, TaskAuditsResponse, Subtask } from '../types'
+import type { Task, CreateTaskRequest, UpdateTaskRequest, Comment, TaskAuditsResponse, Subtask, SubtaskNote } from '../types'
 
 export const taskService = {
   async getAll(): Promise<Task[]> {
@@ -66,6 +66,21 @@ export const taskService = {
 
   async deleteSubtask(taskId: number, subtaskId: number): Promise<void> {
     await api.delete(`/api/v1/tasks/${taskId}/subtasks/${subtaskId}`)
+  },
+
+  // ── Subtask Notes ────────────────────────────────────────────────────────
+  async getSubtaskNotes(subtaskId: number): Promise<SubtaskNote[]> {
+    const res = await api.get<SubtaskNote[]>(`/api/v1/subtasks/${subtaskId}/notes`)
+    return res.data
+  },
+
+  async addSubtaskNote(subtaskId: number, note: string): Promise<SubtaskNote> {
+    const res = await api.post<SubtaskNote>(`/api/v1/subtasks/${subtaskId}/notes`, { note })
+    return res.data
+  },
+
+  async deleteSubtaskNote(noteId: number): Promise<void> {
+    await api.delete(`/api/v1/subtasks/notes/${noteId}`)
   },
 
   // ── Audits ──────────────────────────────────────────────────────────────

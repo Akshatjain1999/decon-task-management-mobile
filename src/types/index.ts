@@ -42,6 +42,13 @@ export interface Subtask {
   ownerName?: string | null
 }
 
+export interface SubtaskNote {
+  id: number
+  note: string
+  createdBy: { id: number; name: string }
+  createdAt: string
+}
+
 // ─── Task ──────────────────────────────────────────────────────────────────
 export type TaskPriority = 'LOW' | 'MEDIUM' | 'HIGH' | 'CRITICAL'
 export type TaskStatus = 'OPEN' | 'IN_PROGRESS' | 'COMPLETED' | 'OVERDUE'
