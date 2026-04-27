@@ -61,7 +61,7 @@ export default function CreateTaskScreen() {
       description: description.trim() || undefined,
       priority,
       taskType,
-      dueDate,
+      dueDate: `${dueDate}T00:00:00`,  // backend expects LocalDateTime
     }
 
     setLoading(true)

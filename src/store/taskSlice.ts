@@ -40,9 +40,14 @@ export const createTask = createAsyncThunk(
   'tasks/create',
   async (data: import('../types').CreateTaskRequest, { rejectWithValue }) => {
     try {
-      return await taskService.create(data)
+      console.log('[createTask] payload:', JSON.stringify(data))
+      const result = await taskService.create(data)
+      console.log('[createTask] success:', JSON.stringify(result))
+      return result
     } catch (e: any) {
-      return rejectWithValue(e.message)
+      const msg = e?.response?.data?.message ?? e?.message ?? 'Unknown error'
+      console.log('[createTask] ERROR:', e?.response?.status, msg, JSON.stringify(e?.response?.data))
+      return rejectWithValue(msg)
     }
   },
 )
