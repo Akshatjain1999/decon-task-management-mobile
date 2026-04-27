@@ -48,8 +48,10 @@ export const taskService = {
   },
 
   // ── Subtasks ────────────────────────────────────────────────────────────
-  async createSubtask(taskId: number, title: string): Promise<Subtask> {
-    const res = await api.post<Subtask>(`/api/v1/tasks/${taskId}/subtasks`, { title })
+  async createSubtask(taskId: number, title: string, ownerId?: number | null): Promise<Subtask> {
+    const body: Record<string, unknown> = { title }
+    if (ownerId) body.ownerId = ownerId
+    const res = await api.post<Subtask>(`/api/v1/tasks/${taskId}/subtasks`, body)
     return res.data
   },
 

@@ -39,6 +39,7 @@ export interface Subtask {
   isComplete: boolean
   sortOrder: number
   createdAt: string
+  ownerId?: number | null
   ownerName?: string | null
 }
 

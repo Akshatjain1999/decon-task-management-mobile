@@ -23,9 +23,10 @@ import type { NativeStackScreenProps } from '@react-navigation/native-stack'
 import type { RootStackParamList } from '../navigation/types'
 import { API_BASE_URL } from '../services/api'
 import { taskService } from '../services/taskService'
+import { userService } from '../services/userService'
 import { useAppDispatch, useAppSelector } from '../store/hooks'
 import { updateTask, fetchTasks } from '../store/taskSlice'
-import type { Task, TaskStatus, Comment, TaskAuditsResponse, Subtask, SubtaskNote, SubtaskStatus } from '../types'
+import type { Task, TaskStatus, Comment, TaskAuditsResponse, Subtask, SubtaskNote, SubtaskStatus, User } from '../types'
 
 type Props = NativeStackScreenProps<RootStackParamList, 'TaskDetail'>
 type Tab = 'details' | 'subtasks' | 'comments' | 'activity'
@@ -102,6 +103,8 @@ export default function TaskDetailScreen({ route, navigation }: Props) {
   // Subtasks
   const [newSubtask, setNewSubtask] = useState('')
   const [addingSubtask, setAddingSubtask] = useState(false)
+  const [newSubtaskOwnerId, setNewSubtaskOwnerId] = useState<number | null>(null)
+  const [users, setUsers] = useState<User[]>([])
   const [togglingSubtaskId, setTogglingSubtaskId] = useState<number | null>(null)
   const [settingStatusId, setSettingStatusId] = useState<number | null>(null)
   const [expandedSubtaskId, setExpandedSubtaskId] = useState<number | null>(null)
@@ -168,6 +171,10 @@ export default function TaskDetailScreen({ route, navigation }: Props) {
   }, [taskId])
 
   useEffect(() => { loadTask() }, [loadTask])
+
+  useEffect(() => {
+    userService.getAll().then(setUsers).catch(() => {})
+  }, [])
 
   const loadAudits = useCallback(async () => {
     if (audits || auditsLoading) return
@@ -380,9 +387,10 @@ export default function TaskDetailScreen({ route, navigation }: Props) {
     if (!task || !newSubtask.trim()) return
     setAddingSubtask(true)
     try {
-      const subtask = await taskService.createSubtask(task.id, newSubtask.trim())
+      const subtask = await taskService.createSubtask(task.id, newSubtask.trim(), newSubtaskOwnerId)
       setTask((prev) => prev ? { ...prev, subtasks: [...prev.subtasks, subtask], subtasksTotal: prev.subtasksTotal + 1 } : prev)
       setNewSubtask('')
+      setNewSubtaskOwnerId(null)
     } catch (e: any) {
       Alert.alert('Error', e?.message || 'Failed to add subtask')
     } finally {
@@ -637,20 +645,43 @@ export default function TaskDetailScreen({ route, navigation }: Props) {
               )}
 
               {/* Add subtask */}
-              <View style={styles.addRow}>
-                <TextInput
-                  style={styles.addInput}
-                  value={newSubtask}
-                  onChangeText={setNewSubtask}
-                  placeholder="New subtask title"
-                  placeholderTextColor="#aaa"
-                  returnKeyType="done"
-                  onSubmitEditing={handleAddSubtask}
-                />
-                <TouchableOpacity style={styles.addBtn} onPress={handleAddSubtask} disabled={addingSubtask || !newSubtask.trim()}>
-                  {addingSubtask
-                    ? <ActivityIndicator size="small" color="#fff" />
-                    : <Text style={styles.addBtnText}>Add</Text>}
+              <View style={{ gap: 6 }}>
+                <View style={styles.addRow}>
+                  <TextInput
+                    style={styles.addInput}
+                    value={newSubtask}
+                    onChangeText={setNewSubtask}
+                    placeholder="New subtask title"
+                    placeholderTextColor="#aaa"
+                    returnKeyType="done"
+                    onSubmitEditing={handleAddSubtask}
+                  />
+                  <TouchableOpacity style={styles.addBtn} onPress={handleAddSubtask} disabled={addingSubtask || !newSubtask.trim()}>
+                    {addingSubtask
+                      ? <ActivityIndicator size="small" color="#fff" />
+                      : <Text style={styles.addBtnText}>Add</Text>}
+                  </TouchableOpacity>
+                </View>
+                {/* Owner picker */}
+                <TouchableOpacity
+                  style={styles.ownerPickerBtn}
+                  onPress={() => {
+                    const options = [
+                      { text: 'No owner', onPress: () => setNewSubtaskOwnerId(null) },
+                      ...users.map((u) => ({ text: u.name, onPress: () => setNewSubtaskOwnerId(u.id) })),
+                      { text: 'Cancel', style: 'cancel' as const },
+                    ]
+                    Alert.alert('Assign Owner', 'Select a user to own this subtask', options)
+                  }}
+                >
+                  <Text style={styles.ownerPickerText}>
+                    👤 {newSubtaskOwnerId ? (users.find((u) => u.id === newSubtaskOwnerId)?.name ?? 'Unknown') : 'Assign owner (optional)'}
+                  </Text>
+                  {newSubtaskOwnerId && (
+                    <TouchableOpacity onPress={() => setNewSubtaskOwnerId(null)}>
+                      <Text style={{ color: '#ba1a1a', fontSize: 12, marginLeft: 6 }}>✕</Text>
+                    </TouchableOpacity>
+                  )}
                 </TouchableOpacity>
               </View>
             </View>
@@ -776,6 +807,9 @@ function SubtaskRow({ subtask, toggling, settingStatus, notesCount, expanded, on
       {/* Title + status chip row */}
       <View style={styles.subtaskBody}>
         <Text style={[styles.subtaskTitle, subtask.isComplete && styles.strikethrough]}>{subtask.title}</Text>
+        {subtask.ownerName
+          ? <Text style={styles.subtaskOwner}>👤 {subtask.ownerName}</Text>
+          : <Text style={[styles.subtaskOwner, { color: '#ba1a1a' }]}>⚠️ No owner</Text>}
         <View style={styles.subtaskActions}>
           {/* Status chip — tap to change */}
           <TouchableOpacity
@@ -905,7 +939,14 @@ const styles = StyleSheet.create({
   },
   subtaskCheck: { marginRight: 10 },
   subtaskBody: { flex: 1 },
-  subtaskTitle: { fontSize: 14, color: '#222', fontWeight: '500', marginBottom: 4 },
+  subtaskTitle: { fontSize: 14, color: '#222', fontWeight: '500', marginBottom: 2 },
+  subtaskOwner: { fontSize: 11, color: '#546e7a', marginBottom: 4 },
+  ownerPickerBtn: {
+    flexDirection: 'row', alignItems: 'center',
+    backgroundColor: '#e8eaf6', borderRadius: 8,
+    paddingHorizontal: 10, paddingVertical: 7,
+  },
+  ownerPickerText: { fontSize: 13, color: '#1a237e', flex: 1 },
   subtaskRowExpanded: { borderBottomLeftRadius: 0, borderBottomRightRadius: 0, marginBottom: 0 },
   subtaskActions: { flexDirection: 'row', alignItems: 'center', gap: 8, flexWrap: 'wrap' },
   statusChip: { borderRadius: 6, paddingHorizontal: 8, paddingVertical: 3, minWidth: 40 },
