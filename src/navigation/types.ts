@@ -6,6 +6,7 @@ export type RootStackParamList = {
   // Stack screens
   TaskDetail: { taskId: number }
   CreateTask: undefined
+  TaskTypeDashboard: { typeKey: string }
 }
 
 export type BottomTabParamList = {

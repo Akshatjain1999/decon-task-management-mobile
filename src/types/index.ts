@@ -178,6 +178,22 @@ export interface OwnerSubtaskStat {
   completionRate: number
 }
 
+export interface SubtaskPipelineStat {
+  stepTitle: string
+  totalTasks: number
+  completedTasks: number
+  completionRate: number
+}
+
+export interface PipelineTaskItem {
+  id: number
+  title: string
+  status: string
+  priority: string
+  assignedToName: string | null
+  subtaskCompleted: boolean
+}
+
 export interface WccBillingStats {
   wccPending: number
   wccCompleted: number
@@ -193,6 +209,24 @@ export interface TaskTypeBreakdown {
   completionRate: number
   totalSubtasks: number
   completedSubtasks: number
+  wccBillingStats: WccBillingStats
+}
+
+export interface TaskTypeDashboard {
+  taskType: string
+  taskTypeLabel: string
+  totalTasks: number
+  openTasks: number
+  inProgressTasks: number
+  completedTasks: number
+  overdueTasks: number
+  completionRate: number
+  tasksByPriority: Record<string, number>
+  totalSubtasks: number
+  completedSubtasks: number
+  subtaskCompletionRate: number
+  ownerSubtaskStats: OwnerSubtaskStat[]
+  subtaskPipeline: SubtaskPipelineStat[]
   wccBillingStats: WccBillingStats
 }
 
