@@ -168,3 +168,46 @@ export interface DashboardStats {
   totalUsers: number
   tasksByPriority: Record<string, number>
 }
+
+export interface OwnerSubtaskStat {
+  ownerId: number
+  ownerName: string
+  totalSubtasks: number
+  completedSubtasks: number
+  pendingSubtasks: number
+  completionRate: number
+}
+
+export interface WccBillingStats {
+  wccPending: number
+  wccCompleted: number
+  billingPending: number
+  billingCompleted: number
+}
+
+export interface TaskTypeBreakdown {
+  totalTasks: number
+  completedTasks: number
+  inProgressTasks: number
+  overdueTasks: number
+  completionRate: number
+  totalSubtasks: number
+  completedSubtasks: number
+  wccBillingStats: WccBillingStats
+}
+
+export interface SuperAdminDashboard {
+  totalTasks: number
+  openTasks: number
+  inProgressTasks: number
+  completedTasks: number
+  overdueTasks: number
+  totalUsers: number
+  taskCompletionRate: number
+  tasksByPriority: Record<string, number>
+  totalSubtasks: number
+  completedSubtasks: number
+  subtaskCompletionRate: number
+  taskTypeBreakdown: Record<string, TaskTypeBreakdown>
+  topOwners: OwnerSubtaskStat[]
+}
