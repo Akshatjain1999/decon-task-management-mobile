@@ -105,6 +105,7 @@ export default function TaskDetailScreen({ route, navigation }: Props) {
   const [addingSubtask, setAddingSubtask] = useState(false)
   const [newSubtaskOwnerId, setNewSubtaskOwnerId] = useState<number | null>(null)
   const [showOwnerPicker, setShowOwnerPicker] = useState(false)
+  const [statusPickerSubtask, setStatusPickerSubtask] = useState<{ id: number; status: SubtaskStatus } | null>(null)
   const [users, setUsers] = useState<User[]>([])
   const [togglingSubtaskId, setTogglingSubtaskId] = useState<number | null>(null)
   const [settingStatusId, setSettingStatusId] = useState<number | null>(null)
@@ -283,36 +284,28 @@ export default function TaskDetailScreen({ route, navigation }: Props) {
 
   // ─── Subtasks ──────────────────────────────────────────────────────────
   const handleSetSubtaskStatus = (subtaskId: number, currentStatus: SubtaskStatus) => {
-    if (!task) return
-    const statuses: SubtaskStatus[] = ['TODO', 'IN_PROGRESS', 'DONE']
-    Alert.alert(
-      'Set Status',
-      `Current: ${currentStatus.replace('_', ' ')}`,
-      [
-        ...statuses.map((s) => ({
-          text: s.replace('_', ' '),
-          style: (s === currentStatus ? 'default' : 'default') as 'default',
-          onPress: async () => {
-            setSettingStatusId(subtaskId)
-            try {
-              const updated = await taskService.setSubtaskStatus(task.id, subtaskId, s)
-              setTask((prev) => {
-                if (!prev) return prev
-                const subtasks = prev.subtasks.map((st) =>
-                  st.id === subtaskId ? { ...st, status: updated.status, isComplete: updated.isComplete } : st
-                )
-                return { ...prev, subtasks, subtasksCompleted: subtasks.filter((st) => st.isComplete).length }
-              })
-            } catch (e: any) {
-              Alert.alert('Error', e?.message || 'Failed to update status')
-            } finally {
-              setSettingStatusId(null)
-            }
-          },
-        })),
-        { text: 'Cancel', style: 'cancel' },
-      ],
-    )
+    setStatusPickerSubtask({ id: subtaskId, status: currentStatus })
+  }
+
+  const applySubtaskStatus = async (status: SubtaskStatus) => {
+    if (!task || !statusPickerSubtask) return
+    const subtaskId = statusPickerSubtask.id
+    setStatusPickerSubtask(null)
+    setSettingStatusId(subtaskId)
+    try {
+      const updated = await taskService.setSubtaskStatus(task.id, subtaskId, status)
+      setTask((prev) => {
+        if (!prev) return prev
+        const subtasks = prev.subtasks.map((st) =>
+          st.id === subtaskId ? { ...st, status: updated.status, isComplete: updated.isComplete } : st
+        )
+        return { ...prev, subtasks, subtasksCompleted: subtasks.filter((st) => st.isComplete).length }
+      })
+    } catch (e: any) {
+      Alert.alert('Error', e?.message || 'Failed to update status')
+    } finally {
+      setSettingStatusId(null)
+    }
   }
 
   const handleToggleNotes = async (subtaskId: number) => {
@@ -433,6 +426,32 @@ export default function TaskDetailScreen({ route, navigation }: Props) {
 
   return (
     <SafeAreaView style={styles.container} edges={['bottom']}>
+      {/* ── Status picker modal ──────────────────────────────────────── */}
+      <Modal visible={!!statusPickerSubtask} transparent animationType="slide" onRequestClose={() => setStatusPickerSubtask(null)}>
+        <TouchableOpacity style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.4)' }} activeOpacity={1} onPress={() => setStatusPickerSubtask(null)} />
+        <View style={styles.ownerModal}>
+          <View style={styles.ownerModalHandle} />
+          <Text style={styles.ownerModalTitle}>Set Status</Text>
+          {(['TODO', 'IN_PROGRESS', 'DONE'] as SubtaskStatus[]).map((s) => {
+            const color = SUBTASK_STATUS_COLORS[s] ?? '#666'
+            const isSelected = statusPickerSubtask?.status === s
+            return (
+              <TouchableOpacity
+                key={s}
+                style={[styles.ownerModalItem, isSelected && styles.ownerModalItemSelected]}
+                onPress={() => applySubtaskStatus(s)}
+              >
+                <View style={[styles.statusDot, { backgroundColor: color }]} />
+                <Text style={[styles.ownerModalItemText, isSelected && { color, fontWeight: '700' }]}>
+                  {s.replace('_', ' ')}
+                </Text>
+                {isSelected && <Text style={{ color }}>✓</Text>}
+              </TouchableOpacity>
+            )
+          })}
+        </View>
+      </Modal>
+
       {/* ── Owner picker modal ──────────────────────────────────────── */}
       <Modal visible={showOwnerPicker} transparent animationType="slide" onRequestClose={() => setShowOwnerPicker(false)}>
         <TouchableOpacity style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.4)' }} activeOpacity={1} onPress={() => setShowOwnerPicker(false)} />
@@ -975,6 +994,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 10, paddingVertical: 7,
   },
   ownerPickerText: { fontSize: 13, color: '#1a237e', flex: 1 },
+  statusDot: { width: 10, height: 10, borderRadius: 5, marginRight: 4 },
   ownerModal: {
     backgroundColor: '#fff',
     borderTopLeftRadius: 20, borderTopRightRadius: 20,
