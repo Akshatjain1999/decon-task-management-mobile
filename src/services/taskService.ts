@@ -74,7 +74,20 @@ export const taskService = {
     return res.data
   },
 
-  async addSubtaskNote(subtaskId: number, note: string): Promise<SubtaskNote> {
+  async addSubtaskNote(
+    subtaskId: number,
+    note: string,
+    attachment?: { uri: string; name: string; type: string } | null,
+  ): Promise<SubtaskNote> {
+    if (attachment) {
+      const formData = new FormData()
+      formData.append('note', note)
+      formData.append('attachment', { uri: attachment.uri, name: attachment.name, type: attachment.type } as any)
+      const res = await api.post<SubtaskNote>(`/api/v1/subtasks/${subtaskId}/notes`, formData, {
+        headers: { 'Content-Type': 'multipart/form-data' },
+      })
+      return res.data
+    }
     const res = await api.post<SubtaskNote>(`/api/v1/subtasks/${subtaskId}/notes`, { note })
     return res.data
   },

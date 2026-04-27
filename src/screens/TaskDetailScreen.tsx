@@ -11,6 +11,7 @@ import {
   KeyboardAvoidingView,
   Platform,
 } from 'react-native'
+import * as DocumentPicker from 'expo-document-picker'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import type { NativeStackScreenProps } from '@react-navigation/native-stack'
 import type { RootStackParamList } from '../navigation/types'
@@ -101,6 +102,22 @@ export default function TaskDetailScreen({ route, navigation }: Props) {
   const [notesLoading, setNotesLoading] = useState<Record<number, boolean>>({})
   const [noteText, setNoteText] = useState<Record<number, string>>({})
   const [submittingNote, setSubmittingNote] = useState<number | null>(null)
+  const [noteAttachment, setNoteAttachment] = useState<Record<number, { uri: string; name: string; type: string } | null>>({})
+
+  const handlePickAttachment = async (subtaskId: number) => {
+    try {
+      const result = await DocumentPicker.getDocumentAsync({ copyToCacheDirectory: true, multiple: false })
+      if (!result.canceled && result.assets?.length) {
+        const asset = result.assets[0]
+        setNoteAttachment((prev) => ({
+          ...prev,
+          [subtaskId]: { uri: asset.uri, name: asset.name, type: asset.mimeType ?? 'application/octet-stream' },
+        }))
+      }
+    } catch (e: any) {
+      Alert.alert('Error', e?.message || 'Could not pick file')
+    }
+  }
 
   // Audits
   const [audits, setAudits] = useState<TaskAuditsResponse | null>(null)
@@ -283,9 +300,11 @@ export default function TaskDetailScreen({ route, navigation }: Props) {
     if (!text) return
     setSubmittingNote(subtaskId)
     try {
-      const note = await taskService.addSubtaskNote(subtaskId, text)
+      const attachment = noteAttachment[subtaskId] ?? null
+      const note = await taskService.addSubtaskNote(subtaskId, text, attachment)
       setSubtaskNotes((prev) => ({ ...prev, [subtaskId]: [...(prev[subtaskId] || []), note] }))
       setNoteText((prev) => ({ ...prev, [subtaskId]: '' }))
+      setNoteAttachment((prev) => ({ ...prev, [subtaskId]: null }))
     } catch (e: any) {
       Alert.alert('Error', e?.message || 'Failed to add note')
     } finally {
@@ -506,6 +525,11 @@ export default function TaskDetailScreen({ route, navigation }: Props) {
                           <View style={{ flex: 1 }}>
                             <Text style={styles.noteAuthor}>{n.createdBy?.name}</Text>
                             <Text style={styles.noteText}>{n.note}</Text>
+                            {n.hasAttachment && n.attachmentName && (
+                              <View style={styles.attachmentChip}>
+                                <Text style={styles.attachmentChipText}>📎 {n.attachmentName}</Text>
+                              </View>
+                            )}
                             <Text style={styles.noteMeta}>{timeAgo(n.createdAt)}</Text>
                           </View>
                           {n.createdBy?.id === currentUser?.userId && (
@@ -518,6 +542,15 @@ export default function TaskDetailScreen({ route, navigation }: Props) {
                       {!notesLoading[sub.id] && (subtaskNotes[sub.id] || []).length === 0 && (
                         <Text style={styles.noteEmpty}>No notes yet.</Text>
                       )}
+                      {/* Attachment preview */}
+                      {noteAttachment[sub.id] && (
+                        <View style={styles.attachmentPreview}>
+                          <Text style={styles.attachmentPreviewText} numberOfLines={1}>📎 {noteAttachment[sub.id]!.name}</Text>
+                          <TouchableOpacity onPress={() => setNoteAttachment((prev) => ({ ...prev, [sub.id]: null }))}>
+                            <Text style={{ color: '#ba1a1a', fontSize: 12 }}>✕</Text>
+                          </TouchableOpacity>
+                        </View>
+                      )}
                       <View style={styles.addRow}>
                         <TextInput
                           style={styles.addInput}
@@ -527,6 +560,12 @@ export default function TaskDetailScreen({ route, navigation }: Props) {
                           placeholderTextColor="#aaa"
                           multiline
                         />
+                        <TouchableOpacity
+                          style={[styles.addBtn, { backgroundColor: '#546e7a', minWidth: 44 }]}
+                          onPress={() => handlePickAttachment(sub.id)}
+                        >
+                          <Text style={styles.addBtnText}>📎</Text>
+                        </TouchableOpacity>
                         <TouchableOpacity
                           style={styles.addBtn}
                           onPress={() => handleAddSubtaskNote(sub.id)}
@@ -841,6 +880,19 @@ const styles = StyleSheet.create({
   noteText: { fontSize: 13, color: '#333', marginTop: 1 },
   noteMeta: { fontSize: 10, color: '#aaa', marginTop: 2 },
   noteEmpty: { fontSize: 12, color: '#aaa', textAlign: 'center', marginVertical: 8 },
+  attachmentChip: {
+    flexDirection: 'row', alignItems: 'center',
+    backgroundColor: '#e8eaf6', borderRadius: 6,
+    paddingHorizontal: 6, paddingVertical: 2,
+    alignSelf: 'flex-start', marginTop: 4,
+  },
+  attachmentChipText: { fontSize: 11, color: '#1a237e' },
+  attachmentPreview: {
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
+    backgroundColor: '#e8eaf6', borderRadius: 8,
+    paddingHorizontal: 10, paddingVertical: 6, marginBottom: 6,
+  },
+  attachmentPreviewText: { fontSize: 12, color: '#1a237e', flex: 1, marginRight: 8 },
 
   // Add row
   addRow: { flexDirection: 'row', gap: 8, marginTop: 8 },

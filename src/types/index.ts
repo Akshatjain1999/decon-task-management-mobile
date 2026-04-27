@@ -47,6 +47,10 @@ export interface SubtaskNote {
   note: string
   createdBy: { id: number; name: string }
   createdAt: string
+  attachmentName?: string | null
+  attachmentType?: string | null
+  attachmentSize?: number | null
+  hasAttachment: boolean
 }
 
 // ─── Task ──────────────────────────────────────────────────────────────────
