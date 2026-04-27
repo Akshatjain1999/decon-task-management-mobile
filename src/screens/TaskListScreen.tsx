@@ -89,6 +89,7 @@ export default function TaskListScreen() {
         keyExtractor={(s) => s}
         showsHorizontalScrollIndicator={false}
         contentContainerStyle={styles.filterRow}
+        style={styles.filterList}
         renderItem={({ item: tab }) => (
           <TouchableOpacity
             style={[styles.filterTab, filter === tab && styles.filterTabActive]}
@@ -125,7 +126,8 @@ const styles = StyleSheet.create({
   list: { flex: 1 },
   content: { padding: 16, gap: 12, paddingBottom: 80 },
   center: { flex: 1, justifyContent: 'center', alignItems: 'center' },
-  filterRow: { paddingHorizontal: 12, paddingVertical: 10, gap: 8 },
+  filterList: { flexGrow: 0 },
+  filterRow: { paddingHorizontal: 12, paddingVertical: 10, gap: 8, alignItems: 'center' },
   filterTab: {
     paddingHorizontal: 14,
     paddingVertical: 7,
@@ -133,6 +135,8 @@ const styles = StyleSheet.create({
     backgroundColor: '#fff',
     borderWidth: 1.5,
     borderColor: '#c5cae9',
+    height: 34,
+    justifyContent: 'center',
   },
   filterTabActive: { backgroundColor: '#1a237e', borderColor: '#1a237e' },
   filterTabText: { fontSize: 12, fontWeight: '600', color: '#555' },
