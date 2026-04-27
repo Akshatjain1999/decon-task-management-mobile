@@ -10,13 +10,18 @@ import {
   TextInput,
   KeyboardAvoidingView,
   Platform,
+  Modal,
+  Image,
+  Dimensions,
 } from 'react-native'
 import * as DocumentPicker from 'expo-document-picker'
 import * as FileSystem from 'expo-file-system/legacy'
 import * as Sharing from 'expo-sharing'
+import AsyncStorage from '@react-native-async-storage/async-storage'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import type { NativeStackScreenProps } from '@react-navigation/native-stack'
 import type { RootStackParamList } from '../navigation/types'
+import { API_BASE_URL } from '../services/api'
 import { taskService } from '../services/taskService'
 import { useAppDispatch, useAppSelector } from '../store/hooks'
 import { updateTask, fetchTasks } from '../store/taskSlice'
@@ -121,13 +126,21 @@ export default function TaskDetailScreen({ route, navigation }: Props) {
     }
   }
 
-  const handleOpenAttachment = async (noteId: number, fileName: string) => {
+  const [previewImage, setPreviewImage] = useState<string | null>(null)
+
+  const handleOpenAttachment = async (noteId: number, fileName: string, mimeType?: string | null) => {
     try {
-      const url = await taskService.getAttachmentDownloadUrl(noteId)
-      const localUri = FileSystem.cacheDirectory + fileName
-      const { uri } = await FileSystem.downloadAsync(url, localUri)
-      if (await Sharing.isAvailableAsync()) {
-        await Sharing.shareAsync(uri)
+      const token = await AsyncStorage.getItem('auth_token')
+      const url = `${API_BASE_URL}/api/v1/subtasks/notes/${noteId}/attachment`
+      const localUri = (FileSystem.cacheDirectory ?? '') + fileName
+      const { uri } = await FileSystem.downloadAsync(url, localUri, {
+        headers: token ? { Authorization: `Bearer ${token}` } : {},
+      })
+      const isImage = mimeType?.startsWith('image/') || /\.(png|jpe?g|gif|webp)$/i.test(fileName)
+      if (isImage) {
+        setPreviewImage(uri)
+      } else if (await Sharing.isAvailableAsync()) {
+        await Sharing.shareAsync(uri, { mimeType: mimeType ?? undefined })
       } else {
         Alert.alert('Error', 'Sharing is not available on this device')
       }
@@ -411,6 +424,25 @@ export default function TaskDetailScreen({ route, navigation }: Props) {
 
   return (
     <SafeAreaView style={styles.container} edges={['bottom']}>
+      {/* ── Image preview modal ─────────────────────────────────────── */}
+      <Modal visible={!!previewImage} transparent animationType="fade" onRequestClose={() => setPreviewImage(null)}>
+        <View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.92)', justifyContent: 'center', alignItems: 'center' }}>
+          <TouchableOpacity
+            style={{ position: 'absolute', top: 48, right: 20, zIndex: 10, padding: 8 }}
+            onPress={() => setPreviewImage(null)}
+          >
+            <Text style={{ color: '#fff', fontSize: 28, fontWeight: 'bold' }}>✕</Text>
+          </TouchableOpacity>
+          {previewImage && (
+            <Image
+              source={{ uri: previewImage }}
+              style={{ width: Dimensions.get('window').width, height: Dimensions.get('window').height * 0.75 }}
+              resizeMode="contain"
+            />
+          )}
+        </View>
+      </Modal>
+
       <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
         {/* ── Header card ─────────────────────────────────────────────── */}
         <View style={styles.headerCard}>
@@ -545,7 +577,7 @@ export default function TaskDetailScreen({ route, navigation }: Props) {
                             {n.hasAttachment && n.attachmentName && (
                               <TouchableOpacity
                                 style={styles.attachmentChip}
-                                onPress={() => handleOpenAttachment(n.id, n.attachmentName!)}
+                                onPress={() => handleOpenAttachment(n.id, n.attachmentName!, n.attachmentType)}
                               >
                                 <Text style={styles.attachmentChipText}>📎 {n.attachmentName}</Text>
                               </TouchableOpacity>
