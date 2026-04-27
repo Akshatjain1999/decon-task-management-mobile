@@ -357,7 +357,7 @@ export default function DashboardScreen() {
             key={typeKey}
             typeKey={typeKey}
             breakdown={breakdown}
-            onPress={() => navigation.navigate('TaskTypeDashboard', { typeKey })}
+            onPress={() => navigation.getParent()?.navigate('TaskTypeDashboard', { typeKey })}
           />
         ))}
 
