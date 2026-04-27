@@ -1,6 +1,6 @@
 {
   "expo": {
-    "name": "decon-task-management-mobile",
+    "name": "Decon Task Manager",
     "slug": "decon-task-management-mobile",
     "version": "1.0.0",
     "orientation": "portrait",
@@ -13,13 +13,15 @@
       "backgroundColor": "#ffffff"
     },
     "ios": {
-      "supportsTablet": true
+      "supportsTablet": true,
+      "bundleIdentifier": "com.crm.decontaskmanager"
     },
     "android": {
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
         "backgroundColor": "#ffffff"
       },
+      "package": "com.crm.decontaskmanager",
       "edgeToEdgeEnabled": true,
       "predictiveBackGestureEnabled": false
     },
