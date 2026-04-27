@@ -7,6 +7,7 @@ import {
   RefreshControl,
   ActivityIndicator,
 } from 'react-native'
+import { SafeAreaView } from 'react-native-safe-area-context'
 import { useAppSelector } from '../store/hooks'
 import { dashboardService } from '../services/dashboardService'
 import type { DashboardStats } from '../types'
@@ -59,6 +60,7 @@ export default function DashboardScreen() {
   }
 
   return (
+    <SafeAreaView style={{ flex: 1, backgroundColor: '#f5f6fa' }} edges={['top']}>
     <ScrollView
       style={styles.container}
       contentContainerStyle={styles.content}
@@ -109,6 +111,7 @@ export default function DashboardScreen() {
         </View>
       )}
     </ScrollView>
+    </SafeAreaView>
   )
 }
 

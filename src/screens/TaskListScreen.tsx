@@ -8,6 +8,7 @@ import {
   TouchableOpacity,
   ActivityIndicator,
 } from 'react-native'
+import { SafeAreaView } from 'react-native-safe-area-context'
 import { useNavigation } from '@react-navigation/native'
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack'
 import { useAppDispatch, useAppSelector } from '../store/hooks'
@@ -81,8 +82,8 @@ export default function TaskListScreen() {
   }
 
   return (
-    <View style={styles.container}>
-      {/* Filter tabs */}
+    <SafeAreaView style={styles.container} edges={['top']}>
+      {/* Filter tabs */
       <FlatList
         horizontal
         data={FILTER_TABS}
@@ -117,7 +118,7 @@ export default function TaskListScreen() {
       <TouchableOpacity style={styles.fab} onPress={() => navigation.navigate('CreateTask')}>
         <Text style={styles.fabText}>+</Text>
       </TouchableOpacity>
-    </View>
+    </SafeAreaView>
   )
 }
 

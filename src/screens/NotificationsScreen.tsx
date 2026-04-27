@@ -8,6 +8,7 @@ import {
   RefreshControl,
   ActivityIndicator,
 } from 'react-native'
+import { SafeAreaView } from 'react-native-safe-area-context'
 import { useAppDispatch, useAppSelector } from '../store/hooks'
 import { fetchNotifications, markRead, markAllRead } from '../store/notificationSlice'
 import type { Notification, NotificationType } from '../types'
@@ -67,7 +68,7 @@ export default function NotificationsScreen() {
   const handleMarkAllRead = () => { dispatch(markAllRead()) }
 
   return (
-    <View style={styles.container}>
+    <SafeAreaView style={styles.container} edges={['top']}>
       {unreadCount > 0 && (
         <TouchableOpacity style={styles.markAllBtn} onPress={handleMarkAllRead}>
           <Text style={styles.markAllText}>Mark all as read ({unreadCount})</Text>
@@ -87,7 +88,7 @@ export default function NotificationsScreen() {
         }
         contentContainerStyle={styles.list}
       />
-    </View>
+    </SafeAreaView>
   )
 }
 
