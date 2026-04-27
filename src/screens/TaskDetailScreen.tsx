@@ -104,6 +104,7 @@ export default function TaskDetailScreen({ route, navigation }: Props) {
   const [newSubtask, setNewSubtask] = useState('')
   const [addingSubtask, setAddingSubtask] = useState(false)
   const [newSubtaskOwnerId, setNewSubtaskOwnerId] = useState<number | null>(null)
+  const [showOwnerPicker, setShowOwnerPicker] = useState(false)
   const [users, setUsers] = useState<User[]>([])
   const [togglingSubtaskId, setTogglingSubtaskId] = useState<number | null>(null)
   const [settingStatusId, setSettingStatusId] = useState<number | null>(null)
@@ -432,6 +433,40 @@ export default function TaskDetailScreen({ route, navigation }: Props) {
 
   return (
     <SafeAreaView style={styles.container} edges={['bottom']}>
+      {/* ── Owner picker modal ──────────────────────────────────────── */}
+      <Modal visible={showOwnerPicker} transparent animationType="slide" onRequestClose={() => setShowOwnerPicker(false)}>
+        <TouchableOpacity style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.4)' }} activeOpacity={1} onPress={() => setShowOwnerPicker(false)} />
+        <View style={styles.ownerModal}>
+          <View style={styles.ownerModalHandle} />
+          <Text style={styles.ownerModalTitle}>Assign Owner</Text>
+          <TouchableOpacity
+            style={[styles.ownerModalItem, !newSubtaskOwnerId && styles.ownerModalItemSelected]}
+            onPress={() => { setNewSubtaskOwnerId(null); setShowOwnerPicker(false) }}
+          >
+            <Text style={[styles.ownerModalItemText, !newSubtaskOwnerId && { color: '#1a237e', fontWeight: '700' }]}>No owner</Text>
+            {!newSubtaskOwnerId && <Text style={{ color: '#1a237e' }}>✓</Text>}
+          </TouchableOpacity>
+          <ScrollView style={{ maxHeight: 320 }} keyboardShouldPersistTaps="handled">
+            {users.map((u) => (
+              <TouchableOpacity
+                key={u.id}
+                style={[styles.ownerModalItem, newSubtaskOwnerId === u.id && styles.ownerModalItemSelected]}
+                onPress={() => { setNewSubtaskOwnerId(u.id); setShowOwnerPicker(false) }}
+              >
+                <View style={styles.ownerAvatar}>
+                  <Text style={styles.ownerAvatarText}>{u.name.charAt(0).toUpperCase()}</Text>
+                </View>
+                <View style={{ flex: 1 }}>
+                  <Text style={[styles.ownerModalItemText, newSubtaskOwnerId === u.id && { color: '#1a237e', fontWeight: '700' }]}>{u.name}</Text>
+                  <Text style={styles.ownerModalItemSub}>{u.role}</Text>
+                </View>
+                {newSubtaskOwnerId === u.id && <Text style={{ color: '#1a237e' }}>✓</Text>}
+              </TouchableOpacity>
+            ))}
+          </ScrollView>
+        </View>
+      </Modal>
+
       {/* ── Image preview modal ─────────────────────────────────────── */}
       <Modal visible={!!previewImage} transparent animationType="fade" onRequestClose={() => setPreviewImage(null)}>
         <View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.92)', justifyContent: 'center', alignItems: 'center' }}>
@@ -662,24 +697,17 @@ export default function TaskDetailScreen({ route, navigation }: Props) {
                       : <Text style={styles.addBtnText}>Add</Text>}
                   </TouchableOpacity>
                 </View>
-                {/* Owner picker */}
+                {/* Owner picker button */}
                 <TouchableOpacity
                   style={styles.ownerPickerBtn}
-                  onPress={() => {
-                    const options = [
-                      { text: 'No owner', onPress: () => setNewSubtaskOwnerId(null) },
-                      ...users.map((u) => ({ text: u.name, onPress: () => setNewSubtaskOwnerId(u.id) })),
-                      { text: 'Cancel', style: 'cancel' as const },
-                    ]
-                    Alert.alert('Assign Owner', 'Select a user to own this subtask', options)
-                  }}
+                  onPress={() => setShowOwnerPicker(true)}
                 >
                   <Text style={styles.ownerPickerText}>
                     👤 {newSubtaskOwnerId ? (users.find((u) => u.id === newSubtaskOwnerId)?.name ?? 'Unknown') : 'Assign owner (optional)'}
                   </Text>
                   {newSubtaskOwnerId && (
-                    <TouchableOpacity onPress={() => setNewSubtaskOwnerId(null)}>
-                      <Text style={{ color: '#ba1a1a', fontSize: 12, marginLeft: 6 }}>✕</Text>
+                    <TouchableOpacity onPress={(e) => { e.stopPropagation?.(); setNewSubtaskOwnerId(null) }}>
+                      <Text style={{ color: '#ba1a1a', fontSize: 13, marginLeft: 6 }}>✕</Text>
                     </TouchableOpacity>
                   )}
                 </TouchableOpacity>
@@ -947,6 +975,29 @@ const styles = StyleSheet.create({
     paddingHorizontal: 10, paddingVertical: 7,
   },
   ownerPickerText: { fontSize: 13, color: '#1a237e', flex: 1 },
+  ownerModal: {
+    backgroundColor: '#fff',
+    borderTopLeftRadius: 20, borderTopRightRadius: 20,
+    paddingBottom: 32, paddingHorizontal: 16, paddingTop: 12,
+  },
+  ownerModalHandle: {
+    width: 40, height: 4, backgroundColor: '#ddd',
+    borderRadius: 2, alignSelf: 'center', marginBottom: 14,
+  },
+  ownerModalTitle: { fontSize: 16, fontWeight: '700', color: '#1a237e', marginBottom: 10 },
+  ownerModalItem: {
+    flexDirection: 'row', alignItems: 'center', gap: 10,
+    paddingVertical: 12, paddingHorizontal: 8,
+    borderRadius: 8, marginBottom: 2,
+  },
+  ownerModalItemSelected: { backgroundColor: '#e8eaf6' },
+  ownerModalItemText: { fontSize: 14, color: '#222' },
+  ownerModalItemSub: { fontSize: 11, color: '#888', marginTop: 1 },
+  ownerAvatar: {
+    width: 34, height: 34, borderRadius: 17,
+    backgroundColor: '#1a237e', justifyContent: 'center', alignItems: 'center',
+  },
+  ownerAvatarText: { color: '#fff', fontWeight: '700', fontSize: 14 },
   subtaskRowExpanded: { borderBottomLeftRadius: 0, borderBottomRightRadius: 0, marginBottom: 0 },
   subtaskActions: { flexDirection: 'row', alignItems: 'center', gap: 8, flexWrap: 'wrap' },
   statusChip: { borderRadius: 6, paddingHorizontal: 8, paddingVertical: 3, minWidth: 40 },
