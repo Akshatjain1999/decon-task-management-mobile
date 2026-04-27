@@ -88,7 +88,10 @@ export const taskService = {
       formData.append('attachment', { uri: attachment.uri, name: attachment.name, type: attachment.type } as any)
     }
     const res = await api.post<SubtaskNote>(`/api/v1/subtasks/${subtaskId}/notes`, formData, {
-      headers: { 'Content-Type': undefined },
+      // React Native's XHR will append the multipart boundary when it sees this header.
+      // transformRequest bypasses Axios's default JSON.stringify so FormData is sent as-is.
+      headers: { 'Content-Type': 'multipart/form-data' },
+      transformRequest: (data) => data,
       timeout: 60000,
     })
     return res.data
