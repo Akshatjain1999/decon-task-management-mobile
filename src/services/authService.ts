@@ -5,9 +5,12 @@ import type { AuthResponse, LoginRequest } from '../types'
 export const authService = {
   async login(data: LoginRequest): Promise<AuthResponse> {
     const res = await api.post<AuthResponse>('/api/v1/auth/login', data)
-    await AsyncStorage.setItem('auth_token', res.data.token)
-    await AsyncStorage.setItem('auth_user', JSON.stringify(res.data))
-    return res.data
+    const user = res.data
+    if (user?.token) {
+      await AsyncStorage.setItem('auth_token', user.token)
+    }
+    await AsyncStorage.setItem('auth_user', JSON.stringify(user))
+    return user
   },
 
   async logout(): Promise<void> {

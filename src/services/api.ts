@@ -18,9 +18,14 @@ api.interceptors.request.use(async (config) => {
   return config
 })
 
-// Handle 401 globally — clear token; the NavigationService handles redirect
+// Unwrap ApiResponse<T> envelope — backend always returns { success, message, data: T }
 api.interceptors.response.use(
-  (response) => response,
+  (response) => {
+    if (response.data && typeof response.data === 'object' && 'data' in response.data) {
+      response.data = response.data.data
+    }
+    return response
+  },
   async (error) => {
     if (error.response?.status === 401) {
       await AsyncStorage.removeItem('auth_token')
