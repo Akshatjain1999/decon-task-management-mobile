@@ -1183,7 +1183,7 @@ const styles = StyleSheet.create({
   },
   toastBanner: {
     backgroundColor: '#7f1d1d',
-    borderRadius: 14, borderLeftWidth: 4, borderLeftColor: '#ef4444',
+    borderRadius: 14,
     paddingVertical: 13, paddingHorizontal: 16,
     flexDirection: 'row', alignItems: 'center', gap: 10,
   },
