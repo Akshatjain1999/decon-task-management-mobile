@@ -29,7 +29,22 @@
       "favicon": "./assets/favicon.png"
     },
     "plugins": [
-      "expo-sharing"
-    ]
+      "expo-sharing",
+      [
+        "expo-notifications",
+        {
+          "icon": "./assets/icon.png",
+          "color": "#006a66",
+          "defaultChannel": "default",
+          "sounds": []
+        }
+      ]
+    ],
+    "extra": {
+      "eas": {
+        "projectId": "79d6d060-070a-4e52-aee6-86ed7e73f3a5"
+      }
+    },
+    "owner": "akshatjain1999"
   }
 }
