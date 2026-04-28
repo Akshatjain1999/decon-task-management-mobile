@@ -24,4 +24,12 @@ export const dashboardService = {
     )
     return res.data
   },
+
+  async getWorkflowTasks(taskType: string, filter: string): Promise<PipelineTaskItem[]> {
+    const res = await api.get<PipelineTaskItem[]>(
+      `/api/v1/dashboard/task-type/${taskType}/workflow-tasks`,
+      { params: { filter } },
+    )
+    return res.data
+  },
 }

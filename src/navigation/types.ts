@@ -7,6 +7,7 @@ export type RootStackParamList = {
   TaskDetail: { taskId: number }
   CreateTask: undefined
   TaskTypeDashboard: { typeKey: string }
+  WorkflowDetail: { typeKey: string; filter: string }
 }
 
 export type BottomTabParamList = {

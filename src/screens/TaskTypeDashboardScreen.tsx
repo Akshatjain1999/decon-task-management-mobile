@@ -404,16 +404,22 @@ export default function TaskTypeDashboardScreen() {
             <Text style={styles.sectionTitle}>WCC & BILLING STATUS</Text>
             <View style={styles.wccGrid}>
               {[
-                { label: 'WCC Pending',       value: data.wccBillingStats.wccPending,       text: '#b45309', accent: '#fde68a', bg: '#fff8e1' },
-                { label: 'WCC Completed',     value: data.wccBillingStats.wccCompleted,     text: '#166534', accent: '#86efac', bg: '#dcfce7' },
-                { label: 'Billing Pending',   value: data.wccBillingStats.billingPending,   text: '#ba1a1a', accent: '#fca5a5', bg: '#fef2f2' },
-                { label: 'Billing Completed', value: data.wccBillingStats.billingCompleted, text: '#15803d', accent: '#4ade80', bg: '#f0fdf4' },
+                { filter: 'WCC_PENDING',      label: 'WCC Pending',       value: data.wccBillingStats.wccPending,       text: '#b45309', accent: '#fde68a', bg: '#fff8e1' },
+                { filter: 'WCC_COMPLETED',     label: 'WCC Completed',     value: data.wccBillingStats.wccCompleted,     text: '#166534', accent: '#86efac', bg: '#dcfce7' },
+                { filter: 'BILLING_PENDING',   label: 'Billing Pending',   value: data.wccBillingStats.billingPending,   text: '#ba1a1a', accent: '#fca5a5', bg: '#fef2f2' },
+                { filter: 'BILLING_COMPLETED', label: 'Billing Completed', value: data.wccBillingStats.billingCompleted, text: '#15803d', accent: '#4ade80', bg: '#f0fdf4' },
               ].map((c) => (
-                <View key={c.label} style={styles.wccCard}>
+                <TouchableOpacity
+                  key={c.label}
+                  onPress={() => navigation.navigate('WorkflowDetail', { typeKey, filter: c.filter })}
+                  activeOpacity={0.75}
+                  style={styles.wccCard}
+                >
                   <Text style={styles.wccValue}>{c.value}</Text>
                   <Text style={[styles.wccLabel, { color: c.text }]}>{c.label}</Text>
                   <View style={[styles.wccAccent, { backgroundColor: c.accent }]} />
-                </View>
+                  <Text style={[styles.wccArrow, { color: c.text }]}>›</Text>
+                </TouchableOpacity>
               ))}
             </View>
           </>
@@ -636,11 +642,12 @@ const styles = StyleSheet.create({
   wccCard: {
     width: '47%', backgroundColor: '#fff', borderRadius: 16, padding: 14,
     shadowColor: '#041627', shadowOpacity: 0.06, shadowRadius: 10, shadowOffset: { width: 0, height: 4 },
-    elevation: 2, borderWidth: 1, borderColor: '#eceef0',
+    elevation: 2, borderWidth: 1, borderColor: '#eceef0', position: 'relative',
   },
   wccValue: { fontSize: 28, fontWeight: '800', color: '#041627', lineHeight: 32, marginBottom: 2 },
   wccLabel: { fontSize: 9, fontWeight: '700', letterSpacing: 0.8, textTransform: 'uppercase' },
   wccAccent: { marginTop: 8, height: 2, borderRadius: 1 },
+  wccArrow: { position: 'absolute', top: 10, right: 12, fontSize: 20, fontWeight: '300' },
 
   stepRow: {
     flexDirection: 'row', alignItems: 'center', paddingHorizontal: 12, paddingVertical: 12, gap: 8,
