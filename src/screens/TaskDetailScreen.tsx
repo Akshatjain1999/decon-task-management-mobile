@@ -1179,7 +1179,7 @@ const styles = StyleSheet.create({
     borderRadius: 14, borderLeftWidth: 4, borderLeftColor: '#ef4444',
     paddingVertical: 13, paddingHorizontal: 16,
     flexDirection: 'row', alignItems: 'center', gap: 10,
-    shadowColor: '#000', shadowOpacity: 0.25, shadowRadius: 10, elevation: 8,
+    shadowColor: '#000', shadowOpacity: 0.15, shadowRadius: 10, elevation: 0,
   },
   toastText: { color: '#fef2f2', fontSize: 13, fontWeight: '600', flex: 1 },
   center: { flex: 1, justifyContent: 'center', alignItems: 'center' },
