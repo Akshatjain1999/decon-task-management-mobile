@@ -489,6 +489,7 @@ export default function TaskDetailScreen({ route, navigation }: Props) {
       {/* ── Toast banner ─────────────────────────────────────────────── */}
       {toastVisible && (
         <Animated.View style={[styles.toastBanner, { opacity: toastOpacity }]} pointerEvents="none">
+          <Text style={{ fontSize: 16 }}>⚠️</Text>
           <Text style={styles.toastText}>{toastMsg}</Text>
         </Animated.View>
       )}
@@ -1173,12 +1174,14 @@ function CommentCard({ comment, isOwn, onDelete }: { comment: Comment; isOwn: bo
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#f7f9fb' },
   toastBanner: {
-    position: 'absolute', top: 12, left: 16, right: 16, zIndex: 999,
-    backgroundColor: '#041627', borderRadius: 12,
-    paddingVertical: 12, paddingHorizontal: 16,
-    shadowColor: '#000', shadowOpacity: 0.18, shadowRadius: 8, elevation: 6,
+    position: 'absolute', bottom: 28, left: 20, right: 20, zIndex: 999,
+    backgroundColor: '#7f1d1d',
+    borderRadius: 14, borderLeftWidth: 4, borderLeftColor: '#ef4444',
+    paddingVertical: 13, paddingHorizontal: 16,
+    flexDirection: 'row', alignItems: 'center', gap: 10,
+    shadowColor: '#000', shadowOpacity: 0.25, shadowRadius: 10, elevation: 8,
   },
-  toastText: { color: '#fff', fontSize: 13, fontWeight: '600', textAlign: 'center' },
+  toastText: { color: '#fef2f2', fontSize: 13, fontWeight: '600', flex: 1 },
   center: { flex: 1, justifyContent: 'center', alignItems: 'center' },
 
   // ── Hero Header ──
