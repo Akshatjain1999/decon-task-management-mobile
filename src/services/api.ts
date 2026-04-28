@@ -32,7 +32,7 @@ api.interceptors.response.use(
       await AsyncStorage.removeItem('auth_user')
     }
     // Debug: log full error details to Metro console
-    console.error('[API ERROR]', {
+    console.warn('[API ERROR]', {
       status: error.response?.status,
       data: JSON.stringify(error.response?.data),
       message: error.message,
