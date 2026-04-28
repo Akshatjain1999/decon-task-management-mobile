@@ -111,6 +111,10 @@ export default function TaskDetailScreen({ route, navigation }: Props) {
   const [showReassignPicker, setShowReassignPicker] = useState(false)
   const [reassigning, setReassigning] = useState(false)
 
+  // Reassign subtask owner
+  const [subtaskOwnerPicker, setSubtaskOwnerPicker] = useState<{ subtaskId: number; title: string; currentOwnerId?: number } | null>(null)
+  const [reassigningSubtask, setReassigningSubtask] = useState<number | null>(null)
+
   const [newSubtask, setNewSubtask] = useState('')
   const [addingSubtask, setAddingSubtask] = useState(false)
   const [newSubtaskOwnerId, setNewSubtaskOwnerId] = useState<number | null>(null)
@@ -242,6 +246,28 @@ export default function TaskDetailScreen({ route, navigation }: Props) {
       Alert.alert('Error', e?.message || 'Failed to reassign task')
     } finally {
       setReassigning(false)
+    }
+  }
+
+  // ─── Reassign subtask owner ──────────────────────────────────────────────
+  const handleReassignSubtaskOwner = async (userId: number | null) => {
+    if (!task || !subtaskOwnerPicker) return
+    const { subtaskId, title } = subtaskOwnerPicker
+    setSubtaskOwnerPicker(null)
+    setReassigningSubtask(subtaskId)
+    try {
+      await taskService.updateSubtask(task.id, subtaskId, title, userId)
+      const ownerUser = userId ? (users.find((u) => u.id === userId) ?? null) : null
+      setTask((prev) => prev ? {
+        ...prev,
+        subtasks: prev.subtasks.map((s) =>
+          s.id === subtaskId ? { ...s, ownerId: userId ?? undefined, ownerName: ownerUser?.name ?? null } : s
+        ),
+      } : prev)
+    } catch (e: any) {
+      Alert.alert('Error', e?.message || 'Failed to update subtask owner')
+    } finally {
+      setReassigningSubtask(null)
     }
   }
 
@@ -461,6 +487,40 @@ export default function TaskDetailScreen({ route, navigation }: Props) {
               </TouchableOpacity>
             )
           })}
+        </View>
+      </Modal>
+
+      {/* ── Reassign subtask owner modal ─────────────────────────── */}
+      <Modal visible={!!subtaskOwnerPicker} transparent animationType="slide" onRequestClose={() => setSubtaskOwnerPicker(null)}>
+        <TouchableOpacity style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.4)' }} activeOpacity={1} onPress={() => setSubtaskOwnerPicker(null)} />
+        <View style={styles.ownerModal}>
+          <View style={styles.ownerModalHandle} />
+          <Text style={styles.ownerModalTitle}>Assign Subtask Owner</Text>
+          <TouchableOpacity
+            style={[styles.ownerModalItem, !subtaskOwnerPicker?.currentOwnerId && styles.ownerModalItemSelected]}
+            onPress={() => handleReassignSubtaskOwner(null)}
+          >
+            <Text style={[styles.ownerModalItemText, !subtaskOwnerPicker?.currentOwnerId && { color: '#006a66', fontWeight: '700' }]}>No owner</Text>
+            {!subtaskOwnerPicker?.currentOwnerId && <Text style={{ color: '#006a66' }}>✓</Text>}
+          </TouchableOpacity>
+          <ScrollView style={{ maxHeight: 320 }} keyboardShouldPersistTaps="handled">
+            {users.map((u) => (
+              <TouchableOpacity
+                key={u.id}
+                style={[styles.ownerModalItem, subtaskOwnerPicker?.currentOwnerId === u.id && styles.ownerModalItemSelected]}
+                onPress={() => handleReassignSubtaskOwner(u.id)}
+              >
+                <View style={styles.ownerAvatar}>
+                  <Text style={styles.ownerAvatarText}>{u.name.charAt(0).toUpperCase()}</Text>
+                </View>
+                <View style={{ flex: 1 }}>
+                  <Text style={[styles.ownerModalItemText, subtaskOwnerPicker?.currentOwnerId === u.id && { color: '#006a66', fontWeight: '700' }]}>{u.name}</Text>
+                  <Text style={styles.ownerModalItemSub}>{u.role}</Text>
+                </View>
+                {subtaskOwnerPicker?.currentOwnerId === u.id && <Text style={{ color: '#006a66' }}>✓</Text>}
+              </TouchableOpacity>
+            ))}
+          </ScrollView>
         </View>
       </Modal>
 
@@ -780,12 +840,14 @@ export default function TaskDetailScreen({ route, navigation }: Props) {
                     subtask={sub}
                     toggling={togglingSubtaskId === sub.id}
                     settingStatus={settingStatusId === sub.id}
+                    reassigningOwner={reassigningSubtask === sub.id}
                     notesCount={subtaskNotes[sub.id]?.length ?? 0}
                     expanded={expandedSubtaskId === sub.id}
                     onToggle={() => handleToggleSubtask(sub.id)}
                     onSetStatus={() => handleSetSubtaskStatus(sub.id, sub.status)}
                     onToggleNotes={() => handleToggleNotes(sub.id)}
                     onDelete={() => handleDeleteSubtask(sub.id)}
+                    onReassignOwner={() => setSubtaskOwnerPicker({ subtaskId: sub.id, title: sub.title, currentOwnerId: sub.ownerId ?? undefined })}
                   />
                   {expandedSubtaskId === sub.id && (
                     <View style={styles.notesPanel}>
@@ -995,16 +1057,18 @@ function MetaRow({ label, value }: { label: string; value: string }) {
   )
 }
 
-function SubtaskRow({ subtask, toggling, settingStatus, notesCount, expanded, onToggle, onSetStatus, onToggleNotes, onDelete }: {
+function SubtaskRow({ subtask, toggling, settingStatus, reassigningOwner, notesCount, expanded, onToggle, onSetStatus, onToggleNotes, onDelete, onReassignOwner }: {
   subtask: Subtask
   toggling: boolean
   settingStatus: boolean
+  reassigningOwner: boolean
   notesCount: number
   expanded: boolean
   onToggle: () => void
   onSetStatus: () => void
   onToggleNotes: () => void
   onDelete: () => void
+  onReassignOwner: () => void
 }) {
   return (
     <View style={[styles.subtaskRow, expanded && styles.subtaskRowExpanded]}>
@@ -1018,9 +1082,13 @@ function SubtaskRow({ subtask, toggling, settingStatus, notesCount, expanded, on
       {/* Title + status chip row */}
       <View style={styles.subtaskBody}>
         <Text style={[styles.subtaskTitle, subtask.isComplete && styles.strikethrough]}>{subtask.title}</Text>
-        {subtask.ownerName
-          ? <Text style={styles.subtaskOwner}>👤 {subtask.ownerName}</Text>
-          : <Text style={[styles.subtaskOwner, { color: '#ba1a1a' }]}>⚠️ No owner</Text>}
+        <TouchableOpacity onPress={onReassignOwner} disabled={reassigningOwner}>
+          {reassigningOwner
+            ? <ActivityIndicator size="small" color="#006a66" style={{ marginVertical: 2 }} />
+            : subtask.ownerName
+              ? <Text style={[styles.subtaskOwner, { color: '#006a66', textDecorationLine: 'underline' }]}>👤 {subtask.ownerName} ✎</Text>
+              : <Text style={[styles.subtaskOwner, { color: '#9aa0a6' }]}>👤 Assign owner ✎</Text>}
+        </TouchableOpacity>
         <View style={styles.subtaskActions}>
           {/* Status chip — tap to change */}
           <TouchableOpacity

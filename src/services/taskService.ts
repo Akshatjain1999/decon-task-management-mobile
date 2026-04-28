@@ -67,6 +67,11 @@ export const taskService = {
     return res.data
   },
 
+  async updateSubtask(taskId: number, subtaskId: number, title: string, ownerId?: number | null): Promise<Subtask> {
+    const res = await api.put<Subtask>(`/api/v1/tasks/${taskId}/subtasks/${subtaskId}`, { title, ownerId: ownerId ?? null })
+    return res.data
+  },
+
   async deleteSubtask(taskId: number, subtaskId: number): Promise<void> {
     await api.delete(`/api/v1/tasks/${taskId}/subtasks/${subtaskId}`)
   },
