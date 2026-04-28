@@ -234,8 +234,9 @@ export default function TaskDetailScreen({ route, navigation }: Props) {
     setShowReassignPicker(false)
     setReassigning(true)
     try {
-      const updated = await taskService.update(taskId, { assignedToId: userId ?? undefined })
-      setTask(updated)
+      await taskService.update(taskId, { assignedToId: userId ?? undefined })
+      const assignedUser = userId ? (users.find((u) => u.id === userId) ?? null) : null
+      setTask((prev) => prev ? { ...prev, assignedTo: assignedUser } : prev)
       dispatch(updateTask({ id: taskId, data: { assignedToId: userId ?? undefined } }))
     } catch (e: any) {
       Alert.alert('Error', e?.message || 'Failed to reassign task')
