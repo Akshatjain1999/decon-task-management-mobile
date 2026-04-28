@@ -107,6 +107,10 @@ export default function TaskDetailScreen({ route, navigation }: Props) {
   const [submittingComment, setSubmittingComment] = useState(false)
 
   // Subtasks
+  // Reassign task owner
+  const [showReassignPicker, setShowReassignPicker] = useState(false)
+  const [reassigning, setReassigning] = useState(false)
+
   const [newSubtask, setNewSubtask] = useState('')
   const [addingSubtask, setAddingSubtask] = useState(false)
   const [newSubtaskOwnerId, setNewSubtaskOwnerId] = useState<number | null>(null)
@@ -223,6 +227,22 @@ export default function TaskDetailScreen({ route, navigation }: Props) {
   }
 
   const showStatusPicker = () => setShowStatusModal(true)
+
+  // ─── Reassign ──────────────────────────────────────────────────────────
+  const handleReassign = async (userId: number | null) => {
+    if (!task) return
+    setShowReassignPicker(false)
+    setReassigning(true)
+    try {
+      const updated = await taskService.update(taskId, { assignedToId: userId ?? undefined })
+      setTask(updated)
+      dispatch(updateTask({ id: taskId, data: { assignedToId: userId ?? undefined } }))
+    } catch (e: any) {
+      Alert.alert('Error', e?.message || 'Failed to reassign task')
+    } finally {
+      setReassigning(false)
+    }
+  }
 
   // ─── Delete ────────────────────────────────────────────────────────────
   const handleDelete = () => {
@@ -443,7 +463,41 @@ export default function TaskDetailScreen({ route, navigation }: Props) {
         </View>
       </Modal>
 
-      {/* ── Owner picker modal ──────────────────────────────────────── */}
+      {/* ── Reassign task owner modal ──────────────────────────────── */}
+      <Modal visible={showReassignPicker} transparent animationType="slide" onRequestClose={() => setShowReassignPicker(false)}>
+        <TouchableOpacity style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.4)' }} activeOpacity={1} onPress={() => setShowReassignPicker(false)} />
+        <View style={styles.ownerModal}>
+          <View style={styles.ownerModalHandle} />
+          <Text style={styles.ownerModalTitle}>Reassign Task</Text>
+          <TouchableOpacity
+            style={[styles.ownerModalItem, !task?.assignedTo && styles.ownerModalItemSelected]}
+            onPress={() => handleReassign(null)}
+          >
+            <Text style={[styles.ownerModalItemText, !task?.assignedTo && { color: '#006a66', fontWeight: '700' }]}>Unassigned</Text>
+            {!task?.assignedTo && <Text style={{ color: '#006a66' }}>✓</Text>}
+          </TouchableOpacity>
+          <ScrollView style={{ maxHeight: 320 }} keyboardShouldPersistTaps="handled">
+            {users.map((u) => (
+              <TouchableOpacity
+                key={u.id}
+                style={[styles.ownerModalItem, task?.assignedTo?.id === u.id && styles.ownerModalItemSelected]}
+                onPress={() => handleReassign(u.id)}
+              >
+                <View style={styles.ownerAvatar}>
+                  <Text style={styles.ownerAvatarText}>{u.name.charAt(0).toUpperCase()}</Text>
+                </View>
+                <View style={{ flex: 1 }}>
+                  <Text style={[styles.ownerModalItemText, task?.assignedTo?.id === u.id && { color: '#006a66', fontWeight: '700' }]}>{u.name}</Text>
+                  <Text style={styles.ownerModalItemSub}>{u.role}</Text>
+                </View>
+                {task?.assignedTo?.id === u.id && <Text style={{ color: '#006a66' }}>✓</Text>}
+              </TouchableOpacity>
+            ))}
+          </ScrollView>
+        </View>
+      </Modal>
+
+      {/* ── Owner picker modal (subtask) ────────────────────────────── */}
       <Modal visible={showOwnerPicker} transparent animationType="slide" onRequestClose={() => setShowOwnerPicker(false)}>
         <TouchableOpacity style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.4)' }} activeOpacity={1} onPress={() => setShowOwnerPicker(false)} />
         <View style={styles.ownerModal}>
@@ -679,7 +733,19 @@ export default function TaskDetailScreen({ route, navigation }: Props) {
                 <MetaRow label="Status" value={task.status.replace('_', ' ')} />
                 <MetaRow label="Priority" value={task.priority} />
                 <MetaRow label="Due Date" value={formatDate(task.dueDate)} />
-                <MetaRow label="Assigned To" value={task.assignedTo?.name ?? 'Unassigned'} />
+                <TouchableOpacity onPress={() => setShowReassignPicker(true)} disabled={reassigning}>
+                  <View style={styles.metaRow}>
+                    <Text style={styles.metaLabel}>Assigned To</Text>
+                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, flex: 1, justifyContent: 'flex-end' }}>
+                      {reassigning
+                        ? <ActivityIndicator size="small" color="#006a66" />
+                        : <Text style={[styles.metaValue, { color: '#006a66', textDecorationLine: 'underline' }]}>
+                            {task.assignedTo?.name ?? 'Unassigned'}
+                          </Text>}
+                      <Text style={{ fontSize: 10, color: '#9aa0a6' }}>✎</Text>
+                    </View>
+                  </View>
+                </TouchableOpacity>
                 <MetaRow label="Created By" value={task.createdBy?.name ?? '—'} />
                 <MetaRow label="Created" value={formatDate(task.createdAt)} />
                 {task.updatedAt && <MetaRow label="Updated" value={formatDate(task.updatedAt)} />}
