@@ -46,6 +46,7 @@ export default function CreateTaskScreen() {
   const [priority, setPriority] = useState<TaskPriority>('MEDIUM')
   const [taskType, setTaskType] = useState<TaskType>('CCTV_INSTALLATION')
   const [dateObj, setDateObj] = useState<Date | null>(null)
+  const [pendingDate, setPendingDate] = useState<Date>(new Date())
   const [showDatePicker, setShowDatePicker] = useState(false)
   const [assignedToId, setAssignedToId] = useState<number | null>(null)
   const [assignedToName, setAssignedToName] = useState('')
@@ -72,12 +73,35 @@ export default function CreateTaskScreen() {
   const formatDisplay = (d: Date) =>
     d.toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'long', year: 'numeric' })
 
-  const onDateChange = (_: DateTimePickerEvent, selected?: Date) => {
-    if (Platform.OS === 'android') setShowDatePicker(false)
-    if (selected) {
+  const openDatePicker = () => {
+    setPendingDate(dateObj ?? new Date())
+    setShowDatePicker(true)
+  }
+
+  // iOS: only update pendingDate while browsing; commit on Done
+  const onDateChangeiOS = (_: DateTimePickerEvent, selected?: Date) => {
+    if (selected) setPendingDate(selected)
+  }
+
+  const confirmDateiOS = () => {
+    setDateObj(pendingDate)
+    setErrors((e) => ({ ...e, dueDate: '' }))
+    setShowDatePicker(false)
+  }
+
+  const cancelDateiOS = () => {
+    setShowDatePicker(false)
+    // pendingDate is discarded — dateObj unchanged
+  }
+
+  // Android: fires once on confirm or dismiss
+  const onDateChangeAndroid = (event: DateTimePickerEvent, selected?: Date) => {
+    setShowDatePicker(false)
+    if (event.type === 'set' && selected) {
       setDateObj(selected)
       setErrors((e) => ({ ...e, dueDate: '' }))
     }
+    // type === 'dismissed' → user cancelled, dateObj unchanged
   }
 
   const validate = () => {
@@ -250,7 +274,7 @@ export default function CreateTaskScreen() {
           <View style={styles.section}>
             <Text style={styles.label}>Due Date<Text style={styles.requiredMark}> *</Text></Text>
             <TouchableOpacity
-              onPress={() => setShowDatePicker(true)}
+              onPress={openDatePicker}
               activeOpacity={0.75}
               style={[styles.pickerBtn, errors.dueDate ? styles.pickerBtnError : undefined]}
             >
@@ -271,14 +295,14 @@ export default function CreateTaskScreen() {
             </TouchableOpacity>
             {errors.dueDate ? <Text style={styles.errorText}>{errors.dueDate}</Text> : null}
 
-            {/* Android: inline dialog */}
+            {/* Android: shows system calendar dialog once */}
             {Platform.OS === 'android' && showDatePicker && (
               <DateTimePicker
-                value={dateObj ?? new Date()}
+                value={pendingDate}
                 mode="date"
                 display="calendar"
                 minimumDate={new Date()}
-                onChange={onDateChange}
+                onChange={onDateChangeAndroid}
               />
             )}
           </View>
@@ -294,22 +318,25 @@ export default function CreateTaskScreen() {
               <TouchableOpacity
                 style={styles.modalOverlay}
                 activeOpacity={1}
-                onPress={() => setShowDatePicker(false)}
+                onPress={cancelDateiOS}
               />
               <View style={styles.modalSheet}>
                 <View style={styles.sheetHandle} />
                 <View style={styles.dateSheetHeader}>
+                  <TouchableOpacity onPress={cancelDateiOS} style={styles.dateSheetCancel}>
+                    <Text style={styles.dateSheetCancelText}>Cancel</Text>
+                  </TouchableOpacity>
                   <Text style={styles.sheetTitle}>Select Due Date</Text>
-                  <TouchableOpacity onPress={() => setShowDatePicker(false)} style={styles.dateSheetDone}>
+                  <TouchableOpacity onPress={confirmDateiOS} style={styles.dateSheetDone}>
                     <Text style={styles.dateSheetDoneText}>Done</Text>
                   </TouchableOpacity>
                 </View>
                 <DateTimePicker
-                  value={dateObj ?? new Date()}
+                  value={pendingDate}
                   mode="date"
                   display="inline"
                   minimumDate={new Date()}
-                  onChange={onDateChange}
+                  onChange={onDateChangeiOS}
                   style={{ alignSelf: 'center' }}
                 />
               </View>
@@ -510,6 +537,8 @@ const styles = StyleSheet.create({
   datePickerText: { flex: 1, fontSize: 14, fontWeight: '500', color: '#041627' },
   dateClear: { fontSize: 13, color: '#9aa5b1', fontWeight: '700', paddingHorizontal: 2 },
   dateSheetHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 4 },
+  dateSheetCancel: { paddingVertical: 4, paddingHorizontal: 12 },
+  dateSheetCancelText: { color: '#44474c', fontSize: 13, fontWeight: '600' },
   dateSheetDone: { paddingVertical: 4, paddingHorizontal: 12, backgroundColor: '#041627', borderRadius: 8 },
   dateSheetDoneText: { color: '#fff', fontSize: 13, fontWeight: '700' },
 
