@@ -1,11 +1,10 @@
-import React, { useEffect, useState, useCallback } from 'react'
+import React, { useEffect, useState, useCallback, useRef } from 'react'
 import {
   View,
   Text,
   ScrollView,
   StyleSheet,
   ActivityIndicator,
-  Alert,
   TouchableOpacity,
   TextInput,
   KeyboardAvoidingView,
@@ -13,6 +12,7 @@ import {
   Modal,
   Image,
   Dimensions,
+  Animated,
 } from 'react-native'
 import * as DocumentPicker from 'expo-document-picker'
 import * as FileSystem from 'expo-file-system/legacy'
@@ -92,11 +92,33 @@ function formatDate(iso: string | null | undefined): string {
   return new Date(iso).toLocaleDateString('en', { day: 'numeric', month: 'short', year: 'numeric' })
 }
 
+// ─── Toast hook ──────────────────────────────────────────────────────────────
+function useToast() {
+  const [message, setMessage] = useState('')
+  const [visible, setVisible] = useState(false)
+  const opacity = useRef(new Animated.Value(0)).current
+  const timer = useRef<ReturnType<typeof setTimeout> | null>(null)
+
+  const showToast = useCallback((msg: string) => {
+    if (timer.current) clearTimeout(timer.current)
+    setMessage(msg)
+    setVisible(true)
+    Animated.timing(opacity, { toValue: 1, duration: 200, useNativeDriver: true }).start()
+    timer.current = setTimeout(() => {
+      Animated.timing(opacity, { toValue: 0, duration: 300, useNativeDriver: true }).start(() => setVisible(false))
+    }, 3500)
+  }, [opacity])
+
+  return { message, visible, opacity, showToast }
+}
+
 // ─── Main Screen ─────────────────────────────────────────────────────────────
 export default function TaskDetailScreen({ route, navigation }: Props) {
   const { taskId } = route.params
   const dispatch = useAppDispatch()
   const currentUser = useAppSelector((s) => s.auth.user)
+
+  const { message: toastMsg, visible: toastVisible, opacity: toastOpacity, showToast } = useToast()
 
   const [task, setTask] = useState<Task | null>(null)
   const [loading, setLoading] = useState(true)
@@ -141,7 +163,7 @@ export default function TaskDetailScreen({ route, navigation }: Props) {
         }))
       }
     } catch (e: any) {
-      Alert.alert('Error', e?.message || 'Could not pick file')
+      showToast(e?.message || 'Could not pick file')
     }
   }
 
@@ -161,10 +183,10 @@ export default function TaskDetailScreen({ route, navigation }: Props) {
       } else if (await Sharing.isAvailableAsync()) {
         await Sharing.shareAsync(uri, { mimeType: mimeType ?? undefined })
       } else {
-        Alert.alert('Error', 'Sharing is not available on this device')
+        showToast('Sharing is not available on this device')
       }
     } catch (e: any) {
-      Alert.alert('Error', e?.message || 'Could not open attachment')
+      showToast(e?.message || 'Could not open attachment')
     }
   }
 
@@ -186,7 +208,7 @@ export default function TaskDetailScreen({ route, navigation }: Props) {
       const data = await taskService.getById(taskId)
       setTask(data)
     } catch (e: any) {
-      Alert.alert('Error', e?.message || 'Failed to load task')
+      showToast(e?.message || 'Failed to load task')
     } finally {
       setLoading(false)
     }
@@ -205,7 +227,7 @@ export default function TaskDetailScreen({ route, navigation }: Props) {
       const data = await taskService.getAudits(taskId)
       setAudits(data)
     } catch (e: any) {
-      Alert.alert('Error', e?.message || 'Failed to load activity')
+      showToast(e?.message || 'Failed to load activity')
     } finally {
       setAuditsLoading(false)
     }
@@ -224,7 +246,7 @@ export default function TaskDetailScreen({ route, navigation }: Props) {
       setTask(updated)
       dispatch(updateTask({ id: taskId, data: { status: newStatus } }))
     } catch (e: any) {
-      Alert.alert('Error', e?.message || 'Failed to update status')
+      showToast(e?.message || 'Failed to update status')
     } finally {
       setUpdatingStatus(false)
     }
@@ -243,7 +265,7 @@ export default function TaskDetailScreen({ route, navigation }: Props) {
       setTask((prev) => prev ? { ...prev, assignedTo: assignedUser } : prev)
       dispatch(updateTask({ id: taskId, data: { assignedToId: userId ?? undefined } }))
     } catch (e: any) {
-      Alert.alert('Error', e?.message || 'Failed to reassign task')
+      showToast(e?.message || 'Failed to reassign task')
     } finally {
       setReassigning(false)
     }
@@ -265,7 +287,7 @@ export default function TaskDetailScreen({ route, navigation }: Props) {
         ),
       } : prev)
     } catch (e: any) {
-      Alert.alert('Error', e?.message || 'Failed to update subtask owner')
+      showToast(e?.message || 'Failed to update subtask owner')
     } finally {
       setReassigningSubtask(null)
     }
@@ -283,7 +305,7 @@ export default function TaskDetailScreen({ route, navigation }: Props) {
           dispatch(fetchTasks())
           navigation.goBack()
         } catch (e: any) {
-          Alert.alert('Error', e?.message || 'Failed to delete task')
+          showToast(e?.message || 'Failed to delete task')
         }
       },
     })
@@ -298,7 +320,7 @@ export default function TaskDetailScreen({ route, navigation }: Props) {
       setTask((prev) => prev ? { ...prev, comments: [...(prev.comments || []), comment], commentsCount: prev.commentsCount + 1 } : prev)
       setCommentText('')
     } catch (e: any) {
-      Alert.alert('Error', e?.message || 'Failed to post comment')
+      showToast(e?.message || 'Failed to post comment')
     } finally {
       setSubmittingComment(false)
     }
@@ -315,7 +337,7 @@ export default function TaskDetailScreen({ route, navigation }: Props) {
           await taskService.deleteComment(task.id, commentId)
           setTask((prev) => prev ? { ...prev, comments: prev.comments.filter((c) => c.id !== commentId), commentsCount: prev.commentsCount - 1 } : prev)
         } catch (e: any) {
-          Alert.alert('Error', e?.message || 'Failed to delete comment')
+          showToast(e?.message || 'Failed to delete comment')
         }
       },
     })
@@ -341,7 +363,7 @@ export default function TaskDetailScreen({ route, navigation }: Props) {
         return { ...prev, subtasks, subtasksCompleted: subtasks.filter((st) => st.isComplete).length }
       })
     } catch (e: any) {
-      Alert.alert('Error', e?.message || 'Failed to update status')
+      showToast(e?.message || 'Failed to update status')
     } finally {
       setSettingStatusId(null)
     }
@@ -359,7 +381,7 @@ export default function TaskDetailScreen({ route, navigation }: Props) {
       const notes = await taskService.getSubtaskNotes(subtaskId)
       setSubtaskNotes((prev) => ({ ...prev, [subtaskId]: notes }))
     } catch (e: any) {
-      Alert.alert('Error', e?.message || 'Failed to load notes')
+      showToast(e?.message || 'Failed to load notes')
     } finally {
       setNotesLoading((prev) => ({ ...prev, [subtaskId]: false }))
     }
@@ -376,7 +398,7 @@ export default function TaskDetailScreen({ route, navigation }: Props) {
       setNoteText((prev) => ({ ...prev, [subtaskId]: '' }))
       setNoteAttachment((prev) => ({ ...prev, [subtaskId]: null }))
     } catch (e: any) {
-      Alert.alert('Error', e?.message || 'Failed to add note')
+      showToast(e?.message || 'Failed to add note')
     } finally {
       setSubmittingNote(null)
     }
@@ -392,7 +414,7 @@ export default function TaskDetailScreen({ route, navigation }: Props) {
           await taskService.deleteSubtaskNote(noteId)
           setSubtaskNotes((prev) => ({ ...prev, [subtaskId]: prev[subtaskId].filter((n) => n.id !== noteId) }))
         } catch (e: any) {
-          Alert.alert('Error', e?.message || 'Failed to delete note')
+          showToast(e?.message || 'Failed to delete note')
         }
       },
     })
@@ -409,7 +431,7 @@ export default function TaskDetailScreen({ route, navigation }: Props) {
         return { ...prev, subtasks, subtasksCompleted: subtasks.filter((s) => s.isComplete).length }
       })
     } catch (e: any) {
-      Alert.alert('Error', e?.message || 'Failed to toggle subtask')
+      showToast(e?.message || 'Failed to toggle subtask')
     } finally {
       setTogglingSubtaskId(null)
     }
@@ -424,7 +446,7 @@ export default function TaskDetailScreen({ route, navigation }: Props) {
       setNewSubtask('')
       setNewSubtaskOwnerId(null)
     } catch (e: any) {
-      Alert.alert('Error', e?.message || 'Failed to add subtask')
+      showToast(e?.message || 'Failed to add subtask')
     } finally {
       setAddingSubtask(false)
     }
@@ -441,7 +463,7 @@ export default function TaskDetailScreen({ route, navigation }: Props) {
           await taskService.deleteSubtask(task.id, subtaskId)
           setTask((prev) => prev ? { ...prev, subtasks: prev.subtasks.filter((s) => s.id !== subtaskId), subtasksTotal: prev.subtasksTotal - 1 } : prev)
         } catch (e: any) {
-          Alert.alert('Error', e?.message || 'Failed to delete subtask')
+          showToast(e?.message || 'Failed to delete subtask')
         }
       },
     })
@@ -464,6 +486,12 @@ export default function TaskDetailScreen({ route, navigation }: Props) {
 
   return (
     <SafeAreaView style={styles.container} edges={['bottom']}>
+      {/* ── Toast banner ─────────────────────────────────────────────── */}
+      {toastVisible && (
+        <Animated.View style={[styles.toastBanner, { opacity: toastOpacity }]} pointerEvents="none">
+          <Text style={styles.toastText}>{toastMsg}</Text>
+        </Animated.View>
+      )}
       {/* ── Status picker modal ──────────────────────────────────────── */}
       <Modal visible={!!statusPickerSubtask} transparent animationType="slide" onRequestClose={() => setStatusPickerSubtask(null)}>
         <TouchableOpacity style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.4)' }} activeOpacity={1} onPress={() => setStatusPickerSubtask(null)} />
@@ -1144,6 +1172,13 @@ function CommentCard({ comment, isOwn, onDelete }: { comment: Comment; isOwn: bo
 // ─── Styles ───────────────────────────────────────────────────────────────────
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#f7f9fb' },
+  toastBanner: {
+    position: 'absolute', top: 12, left: 16, right: 16, zIndex: 999,
+    backgroundColor: '#041627', borderRadius: 12,
+    paddingVertical: 12, paddingHorizontal: 16,
+    shadowColor: '#000', shadowOpacity: 0.18, shadowRadius: 8, elevation: 6,
+  },
+  toastText: { color: '#fff', fontSize: 13, fontWeight: '600', textAlign: 'center' },
   center: { flex: 1, justifyContent: 'center', alignItems: 'center' },
 
   // ── Hero Header ──
