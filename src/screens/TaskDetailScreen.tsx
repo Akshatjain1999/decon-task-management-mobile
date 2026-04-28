@@ -488,9 +488,11 @@ export default function TaskDetailScreen({ route, navigation }: Props) {
     <SafeAreaView style={styles.container} edges={['bottom']}>
       {/* ── Toast banner ─────────────────────────────────────────────── */}
       {toastVisible && (
-        <Animated.View style={[styles.toastBanner, { opacity: toastOpacity }]} pointerEvents="none">
-          <Text style={{ fontSize: 16 }}>⚠️</Text>
-          <Text style={styles.toastText}>{toastMsg}</Text>
+        <Animated.View style={[styles.toastWrapper, { opacity: toastOpacity }]} pointerEvents="none">
+          <View style={styles.toastBanner}>
+            <Text style={{ fontSize: 16 }}>⚠️</Text>
+            <Text style={styles.toastText}>{toastMsg}</Text>
+          </View>
         </Animated.View>
       )}
       {/* ── Status picker modal ──────────────────────────────────────── */}
@@ -1173,13 +1175,17 @@ function CommentCard({ comment, isOwn, onDelete }: { comment: Comment; isOwn: bo
 // ─── Styles ───────────────────────────────────────────────────────────────────
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#f7f9fb' },
-  toastBanner: {
+  toastWrapper: {
     position: 'absolute', bottom: 28, left: 20, right: 20, zIndex: 999,
+    shadowColor: '#000', shadowOpacity: 0.18, shadowRadius: 10,
+    shadowOffset: { width: 0, height: 4 },
+    elevation: 6,
+  },
+  toastBanner: {
     backgroundColor: '#7f1d1d',
     borderRadius: 14, borderLeftWidth: 4, borderLeftColor: '#ef4444',
     paddingVertical: 13, paddingHorizontal: 16,
     flexDirection: 'row', alignItems: 'center', gap: 10,
-    shadowColor: '#000', shadowOpacity: 0.15, shadowRadius: 10, elevation: 0,
   },
   toastText: { color: '#fef2f2', fontSize: 13, fontWeight: '600', flex: 1 },
   center: { flex: 1, justifyContent: 'center', alignItems: 'center' },
