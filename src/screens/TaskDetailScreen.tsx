@@ -164,8 +164,14 @@ export default function TaskDetailScreen({ route, navigation }: Props) {
   const [audits, setAudits] = useState<TaskAuditsResponse | null>(null)
   const [auditsLoading, setAuditsLoading] = useState(false)
 
-  // Status change
+  // Status change modal
+  const [showStatusModal, setShowStatusModal] = useState(false)
   const [updatingStatus, setUpdatingStatus] = useState(false)
+
+  // Confirm modal (for delete / destructive actions)
+  const [confirmModal, setConfirmModal] = useState<{
+    title: string; message: string; danger?: boolean; onConfirm: () => void
+  } | null>(null)
 
   const loadTask = useCallback(async () => {
     try {
@@ -216,43 +222,24 @@ export default function TaskDetailScreen({ route, navigation }: Props) {
     }
   }
 
-  const showStatusPicker = () => {
-    const options: TaskStatus[] = ['OPEN', 'IN_PROGRESS', 'COMPLETED']
-    Alert.alert(
-      'Change Status',
-      `Current: ${task?.status?.replace(/_/g, ' ')}`,
-      [
-        ...options.map((s) => ({
-          text: s.replace(/_/g, ' '),
-          onPress: () => changeStatus(s),
-        })),
-        { text: 'Cancel', style: 'cancel' },
-      ],
-    )
-  }
+  const showStatusPicker = () => setShowStatusModal(true)
 
   // ─── Delete ────────────────────────────────────────────────────────────
   const handleDelete = () => {
-    Alert.alert(
-      'Delete Task',
-      `Permanently delete "${task?.title}"? This cannot be undone.`,
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Delete',
-          style: 'destructive',
-          onPress: async () => {
-            try {
-              await taskService.delete(taskId)
-              dispatch(fetchTasks())
-              navigation.goBack()
-            } catch (e: any) {
-              Alert.alert('Error', e?.message || 'Failed to delete task')
-            }
-          },
-        },
-      ],
-    )
+    setConfirmModal({
+      title: 'Delete Task',
+      message: `Permanently delete "${task?.title}"? This cannot be undone.`,
+      danger: true,
+      onConfirm: async () => {
+        try {
+          await taskService.delete(taskId)
+          dispatch(fetchTasks())
+          navigation.goBack()
+        } catch (e: any) {
+          Alert.alert('Error', e?.message || 'Failed to delete task')
+        }
+      },
+    })
   }
 
   // ─── Comments ──────────────────────────────────────────────────────────
@@ -272,20 +259,19 @@ export default function TaskDetailScreen({ route, navigation }: Props) {
 
   const handleDeleteComment = (commentId: number) => {
     if (!task) return
-    Alert.alert('Delete Comment', 'Remove this comment?', [
-      { text: 'Cancel', style: 'cancel' },
-      {
-        text: 'Delete', style: 'destructive',
-        onPress: async () => {
-          try {
-            await taskService.deleteComment(task.id, commentId)
-            setTask((prev) => prev ? { ...prev, comments: prev.comments.filter((c) => c.id !== commentId), commentsCount: prev.commentsCount - 1 } : prev)
-          } catch (e: any) {
-            Alert.alert('Error', e?.message || 'Failed to delete comment')
-          }
-        },
+    setConfirmModal({
+      title: 'Delete Comment',
+      message: 'Remove this comment?',
+      danger: true,
+      onConfirm: async () => {
+        try {
+          await taskService.deleteComment(task.id, commentId)
+          setTask((prev) => prev ? { ...prev, comments: prev.comments.filter((c) => c.id !== commentId), commentsCount: prev.commentsCount - 1 } : prev)
+        } catch (e: any) {
+          Alert.alert('Error', e?.message || 'Failed to delete comment')
+        }
       },
-    ])
+    })
   }
 
   // ─── Subtasks ──────────────────────────────────────────────────────────
@@ -350,20 +336,19 @@ export default function TaskDetailScreen({ route, navigation }: Props) {
   }
 
   const handleDeleteSubtaskNote = (subtaskId: number, noteId: number) => {
-    Alert.alert('Delete Note', 'Remove this note?', [
-      { text: 'Cancel', style: 'cancel' },
-      {
-        text: 'Delete', style: 'destructive',
-        onPress: async () => {
-          try {
-            await taskService.deleteSubtaskNote(noteId)
-            setSubtaskNotes((prev) => ({ ...prev, [subtaskId]: prev[subtaskId].filter((n) => n.id !== noteId) }))
-          } catch (e: any) {
-            Alert.alert('Error', e?.message || 'Failed to delete note')
-          }
-        },
+    setConfirmModal({
+      title: 'Delete Note',
+      message: 'Remove this note?',
+      danger: true,
+      onConfirm: async () => {
+        try {
+          await taskService.deleteSubtaskNote(noteId)
+          setSubtaskNotes((prev) => ({ ...prev, [subtaskId]: prev[subtaskId].filter((n) => n.id !== noteId) }))
+        } catch (e: any) {
+          Alert.alert('Error', e?.message || 'Failed to delete note')
+        }
       },
-    ])
+    })
   }
 
   const handleToggleSubtask = async (subtaskId: number) => {
@@ -400,20 +385,19 @@ export default function TaskDetailScreen({ route, navigation }: Props) {
 
   const handleDeleteSubtask = (subtaskId: number) => {
     if (!task) return
-    Alert.alert('Delete Subtask', 'Remove this subtask?', [
-      { text: 'Cancel', style: 'cancel' },
-      {
-        text: 'Delete', style: 'destructive',
-        onPress: async () => {
-          try {
-            await taskService.deleteSubtask(task.id, subtaskId)
-            setTask((prev) => prev ? { ...prev, subtasks: prev.subtasks.filter((s) => s.id !== subtaskId), subtasksTotal: prev.subtasksTotal - 1 } : prev)
-          } catch (e: any) {
-            Alert.alert('Error', e?.message || 'Failed to delete subtask')
-          }
-        },
+    setConfirmModal({
+      title: 'Delete Subtask',
+      message: 'Remove this subtask? This cannot be undone.',
+      danger: true,
+      onConfirm: async () => {
+        try {
+          await taskService.deleteSubtask(task.id, subtaskId)
+          setTask((prev) => prev ? { ...prev, subtasks: prev.subtasks.filter((s) => s.id !== subtaskId), subtasksTotal: prev.subtasksTotal - 1 } : prev)
+        } catch (e: any) {
+          Alert.alert('Error', e?.message || 'Failed to delete subtask')
+        }
       },
-    ])
+    })
   }
 
   // ─── Render ────────────────────────────────────────────────────────────
@@ -469,8 +453,8 @@ export default function TaskDetailScreen({ route, navigation }: Props) {
             style={[styles.ownerModalItem, !newSubtaskOwnerId && styles.ownerModalItemSelected]}
             onPress={() => { setNewSubtaskOwnerId(null); setShowOwnerPicker(false) }}
           >
-            <Text style={[styles.ownerModalItemText, !newSubtaskOwnerId && { color: '#1a237e', fontWeight: '700' }]}>No owner</Text>
-            {!newSubtaskOwnerId && <Text style={{ color: '#1a237e' }}>✓</Text>}
+            <Text style={[styles.ownerModalItemText, !newSubtaskOwnerId && { color: '#006a66', fontWeight: '700' }]}>No owner</Text>
+            {!newSubtaskOwnerId && <Text style={{ color: '#006a66' }}>✓</Text>}
           </TouchableOpacity>
           <ScrollView style={{ maxHeight: 320 }} keyboardShouldPersistTaps="handled">
             {users.map((u) => (
@@ -483,10 +467,10 @@ export default function TaskDetailScreen({ route, navigation }: Props) {
                   <Text style={styles.ownerAvatarText}>{u.name.charAt(0).toUpperCase()}</Text>
                 </View>
                 <View style={{ flex: 1 }}>
-                  <Text style={[styles.ownerModalItemText, newSubtaskOwnerId === u.id && { color: '#1a237e', fontWeight: '700' }]}>{u.name}</Text>
+                  <Text style={[styles.ownerModalItemText, newSubtaskOwnerId === u.id && { color: '#006a66', fontWeight: '700' }]}>{u.name}</Text>
                   <Text style={styles.ownerModalItemSub}>{u.role}</Text>
                 </View>
-                {newSubtaskOwnerId === u.id && <Text style={{ color: '#1a237e' }}>✓</Text>}
+                {newSubtaskOwnerId === u.id && <Text style={{ color: '#006a66' }}>✓</Text>}
               </TouchableOpacity>
             ))}
           </ScrollView>
@@ -509,6 +493,72 @@ export default function TaskDetailScreen({ route, navigation }: Props) {
               resizeMode="contain"
             />
           )}
+        </View>
+      </Modal>
+
+      {/* ── Status picker bottom sheet ──────────────────────────────── */}
+      <Modal visible={showStatusModal} transparent animationType="slide" onRequestClose={() => setShowStatusModal(false)}>
+        <TouchableOpacity style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.45)' }} activeOpacity={1} onPress={() => setShowStatusModal(false)} />
+        <View style={styles.ownerModal}>
+          <View style={styles.ownerModalHandle} />
+          <Text style={styles.ownerModalTitle}>Change Status</Text>
+          {task && (
+            <View style={[styles.statusCurrentBadge, { backgroundColor: STATUS_BADGE[task.status]?.bg ?? '#e0e3e5' }]}>
+              <Text style={[{ fontSize: 12, fontWeight: '700', color: STATUS_BADGE[task.status]?.text ?? '#44474c' }]}>
+                Current: {task.status.replace(/_/g, ' ')}
+              </Text>
+            </View>
+          )}
+          <View style={{ gap: 6, marginTop: 8 }}>
+            {(['OPEN', 'IN_PROGRESS', 'COMPLETED'] as TaskStatus[]).map((s) => {
+              const cfg = STATUS_BADGE[s]
+              const isActive = task?.status === s
+              return (
+                <TouchableOpacity
+                  key={s}
+                  style={[styles.statusOptionRow, isActive && { backgroundColor: cfg.bg }]}
+                  onPress={() => {
+                    setShowStatusModal(false)
+                    if (!isActive) changeStatus(s)
+                  }}
+                  disabled={updatingStatus}
+                >
+                  <View style={[styles.statusOptionDot, { backgroundColor: cfg.text }]} />
+                  <Text style={[styles.statusOptionText, isActive && { color: cfg.text, fontWeight: '700' }]}>
+                    {s.replace(/_/g, ' ')}
+                  </Text>
+                  {isActive && <Text style={[{ color: cfg.text, fontWeight: '700', marginLeft: 'auto' as any }]}>✓</Text>}
+                </TouchableOpacity>
+              )
+            })}
+          </View>
+        </View>
+      </Modal>
+
+      {/* ── Confirm / destructive bottom sheet ──────────────────────── */}
+      <Modal visible={!!confirmModal} transparent animationType="slide" onRequestClose={() => setConfirmModal(null)}>
+        <TouchableOpacity style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.45)' }} activeOpacity={1} onPress={() => setConfirmModal(null)} />
+        <View style={[styles.ownerModal, { paddingBottom: 40 }]}>
+          <View style={styles.ownerModalHandle} />
+          <Text style={[styles.ownerModalTitle, { color: '#191c1e', marginBottom: 6 }]}>{confirmModal?.title}</Text>
+          <Text style={styles.confirmMessage}>{confirmModal?.message}</Text>
+          <View style={styles.confirmBtns}>
+            <TouchableOpacity style={styles.confirmCancelBtn} onPress={() => setConfirmModal(null)}>
+              <Text style={styles.confirmCancelText}>Cancel</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.confirmActionBtn, confirmModal?.danger && styles.confirmDangerBtn]}
+              onPress={() => {
+                const fn = confirmModal?.onConfirm
+                setConfirmModal(null)
+                fn?.()
+              }}
+            >
+              <Text style={[styles.confirmActionText, confirmModal?.danger && { color: '#fff' }]}>
+                {confirmModal?.danger ? 'Delete' : 'Confirm'}
+              </Text>
+            </TouchableOpacity>
+          </View>
         </View>
       </Modal>
 
@@ -1076,6 +1126,37 @@ const styles = StyleSheet.create({
     borderRadius: 2, alignSelf: 'center', marginBottom: 14,
   },
   ownerModalTitle: { fontSize: 16, fontWeight: '700', color: '#006a66', marginBottom: 10 },
+
+  // Status picker
+  statusCurrentBadge: {
+    alignSelf: 'flex-start', paddingHorizontal: 12, paddingVertical: 6,
+    borderRadius: 20, marginBottom: 4,
+  },
+  statusOptionRow: {
+    flexDirection: 'row', alignItems: 'center', gap: 12,
+    paddingVertical: 13, paddingHorizontal: 14,
+    borderRadius: 12, borderWidth: 1, borderColor: '#eceef0',
+    backgroundColor: '#fafbfc',
+  },
+  statusOptionDot: { width: 11, height: 11, borderRadius: 6 },
+  statusOptionText: { fontSize: 14, color: '#44474c', fontWeight: '500', flex: 1 },
+
+  // Confirm modal
+  confirmMessage: { fontSize: 14, color: '#44474c', lineHeight: 22, marginBottom: 20 },
+  confirmBtns: { flexDirection: 'row', gap: 10, marginTop: 4 },
+  confirmCancelBtn: {
+    flex: 1, paddingVertical: 13, borderRadius: 14,
+    borderWidth: 1, borderColor: '#e0e3e5',
+    alignItems: 'center', backgroundColor: '#fff',
+  },
+  confirmCancelText: { fontSize: 14, color: '#44474c', fontWeight: '600' },
+  confirmActionBtn: {
+    flex: 1, paddingVertical: 13, borderRadius: 14,
+    borderWidth: 1, borderColor: '#e0e3e5',
+    alignItems: 'center', backgroundColor: '#f7f9fb',
+  },
+  confirmDangerBtn: { backgroundColor: '#ba1a1a', borderColor: '#ba1a1a' },
+  confirmActionText: { fontSize: 14, color: '#191c1e', fontWeight: '700' },
   ownerModalItem: {
     flexDirection: 'row', alignItems: 'center', gap: 10,
     paddingVertical: 12, paddingHorizontal: 8, borderRadius: 10, marginBottom: 2,
