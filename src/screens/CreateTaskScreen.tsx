@@ -12,6 +12,7 @@ import {
   KeyboardAvoidingView,
   Platform,
 } from 'react-native'
+import DateTimePicker, { type DateTimePickerEvent } from '@react-native-community/datetimepicker'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { useNavigation } from '@react-navigation/native'
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack'
@@ -44,8 +45,8 @@ export default function CreateTaskScreen() {
   const [description, setDescription] = useState('')
   const [priority, setPriority] = useState<TaskPriority>('MEDIUM')
   const [taskType, setTaskType] = useState<TaskType>('CCTV_INSTALLATION')
-  const [dueDate, setDueDate] = useState('')
-  const [dueTime, setDueTime] = useState('09:00')
+  const [dateObj, setDateObj] = useState<Date | null>(null)
+  const [showDatePicker, setShowDatePicker] = useState(false)
   const [assignedToId, setAssignedToId] = useState<number | null>(null)
   const [assignedToName, setAssignedToName] = useState('')
 
@@ -65,11 +66,24 @@ export default function CreateTaskScreen() {
       .finally(() => setUsersLoading(false))
   }, [])
 
+  const formatDate = (d: Date) =>
+    `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+
+  const formatDisplay = (d: Date) =>
+    d.toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'long', year: 'numeric' })
+
+  const onDateChange = (_: DateTimePickerEvent, selected?: Date) => {
+    if (Platform.OS === 'android') setShowDatePicker(false)
+    if (selected) {
+      setDateObj(selected)
+      setErrors((e) => ({ ...e, dueDate: '' }))
+    }
+  }
+
   const validate = () => {
     const e: Record<string, string> = {}
     if (!title.trim()) e.title = 'Title is required.'
-    if (!dueDate || !/^\d{4}-\d{2}-\d{2}$/.test(dueDate)) e.dueDate = 'Enter a valid date (YYYY-MM-DD).'
-    if (!dueTime || !/^\d{2}:\d{2}$/.test(dueTime)) e.dueTime = 'Enter a valid time (HH:MM).'
+    if (!dateObj) e.dueDate = 'Please select a due date.'
     setErrors(e)
     return Object.keys(e).length === 0
   }
@@ -82,7 +96,7 @@ export default function CreateTaskScreen() {
       priority,
       taskType,
       assignedToId: assignedToId ?? undefined,
-      dueDate: `${dueDate}T${dueTime}:00`,
+      dueDate: `${formatDate(dateObj!)}T00:00:00`,
     }
     setLoading(true)
     try {
@@ -232,39 +246,75 @@ export default function CreateTaskScreen() {
             ) : null}
           </View>
 
-          {/* Due Date & Time */}
+          {/* Due Date */}
           <View style={styles.section}>
-            <Text style={styles.label}>Due Date &amp; Time<Text style={styles.requiredMark}> *</Text></Text>
-            <View style={styles.dateRow}>
-              <View style={{ flex: 3 }}>
-                <TextInput
-                  style={[styles.input, errors.dueDate ? styles.inputError : undefined]}
-                  value={dueDate}
-                  onChangeText={(v) => { setDueDate(v); setErrors((e) => ({ ...e, dueDate: '' })) }}
-                  placeholder="YYYY-MM-DD"
-                  placeholderTextColor="#9aa5b1"
-                  keyboardType="numbers-and-punctuation"
-                  maxLength={10}
-                />
-                {errors.dueDate ? <Text style={styles.errorText}>{errors.dueDate}</Text> : null}
-              </View>
-              <View style={{ flex: 2 }}>
-                <TextInput
-                  style={[styles.input, errors.dueTime ? styles.inputError : undefined]}
-                  value={dueTime}
-                  onChangeText={(v) => { setDueTime(v); setErrors((e) => ({ ...e, dueTime: '' })) }}
-                  placeholder="HH:MM"
-                  placeholderTextColor="#9aa5b1"
-                  keyboardType="numbers-and-punctuation"
-                  maxLength={5}
-                />
-                {errors.dueTime ? <Text style={styles.errorText}>{errors.dueTime}</Text> : null}
-              </View>
-            </View>
-            <Text style={styles.dateHint}>
-              {dueDate && dueTime ? `Due: ${dueDate} at ${dueTime}` : 'Enter date and time above'}
-            </Text>
+            <Text style={styles.label}>Due Date<Text style={styles.requiredMark}> *</Text></Text>
+            <TouchableOpacity
+              onPress={() => setShowDatePicker(true)}
+              activeOpacity={0.75}
+              style={[styles.pickerBtn, errors.dueDate ? styles.pickerBtnError : undefined]}
+            >
+              <Text style={styles.dateIcon}>&#x1F4C5;</Text>
+              <Text style={[styles.datePickerText, !dateObj && { color: '#9aa5b1' }]}>
+                {dateObj ? formatDisplay(dateObj) : 'Select a due date...'}
+              </Text>
+              {dateObj ? (
+                <TouchableOpacity
+                  onPress={() => setDateObj(null)}
+                  hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                >
+                  <Text style={styles.dateClear}>&#x2715;</Text>
+                </TouchableOpacity>
+              ) : (
+                <Text style={styles.pickerChevron}>&#x25BC;</Text>
+              )}
+            </TouchableOpacity>
+            {errors.dueDate ? <Text style={styles.errorText}>{errors.dueDate}</Text> : null}
+
+            {/* Android: inline dialog */}
+            {Platform.OS === 'android' && showDatePicker && (
+              <DateTimePicker
+                value={dateObj ?? new Date()}
+                mode="date"
+                display="calendar"
+                minimumDate={new Date()}
+                onChange={onDateChange}
+              />
+            )}
           </View>
+
+          {/* iOS date picker bottom sheet */}
+          {Platform.OS === 'ios' && (
+            <Modal
+              visible={showDatePicker}
+              animationType="slide"
+              transparent
+              onRequestClose={() => setShowDatePicker(false)}
+            >
+              <TouchableOpacity
+                style={styles.modalOverlay}
+                activeOpacity={1}
+                onPress={() => setShowDatePicker(false)}
+              />
+              <View style={styles.modalSheet}>
+                <View style={styles.sheetHandle} />
+                <View style={styles.dateSheetHeader}>
+                  <Text style={styles.sheetTitle}>Select Due Date</Text>
+                  <TouchableOpacity onPress={() => setShowDatePicker(false)} style={styles.dateSheetDone}>
+                    <Text style={styles.dateSheetDoneText}>Done</Text>
+                  </TouchableOpacity>
+                </View>
+                <DateTimePicker
+                  value={dateObj ?? new Date()}
+                  mode="date"
+                  display="inline"
+                  minimumDate={new Date()}
+                  onChange={onDateChange}
+                  style={{ alignSelf: 'center' }}
+                />
+              </View>
+            </Modal>
+          )}
 
           {/* Submit error */}
           {errors.submit ? (
@@ -443,6 +493,7 @@ const styles = StyleSheet.create({
     borderColor: '#e0e3e5',
     gap: 8,
   },
+  pickerBtnError: { borderColor: '#ba1a1a', backgroundColor: '#fff8f8' },
   pickerPlaceholder: { flex: 1, fontSize: 14, color: '#9aa5b1' },
   pickerChevron: { fontSize: 9, color: '#9aa5b1', fontWeight: '700' },
   pickerSelected: { flex: 1, flexDirection: 'row', alignItems: 'center', gap: 10 },
@@ -455,8 +506,12 @@ const styles = StyleSheet.create({
   clearBtn: { marginTop: 8, alignSelf: 'flex-start' },
   clearBtnText: { fontSize: 11, color: '#ba1a1a', fontWeight: '600' },
 
-  dateRow: { flexDirection: 'row', gap: 10 },
-  dateHint: { fontSize: 11, color: '#44474c', marginTop: 8, fontWeight: '500' },
+  dateIcon: { fontSize: 16, flexShrink: 0 },
+  datePickerText: { flex: 1, fontSize: 14, fontWeight: '500', color: '#041627' },
+  dateClear: { fontSize: 13, color: '#9aa5b1', fontWeight: '700', paddingHorizontal: 2 },
+  dateSheetHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 4 },
+  dateSheetDone: { paddingVertical: 4, paddingHorizontal: 12, backgroundColor: '#041627', borderRadius: 8 },
+  dateSheetDoneText: { color: '#fff', fontSize: 13, fontWeight: '700' },
 
   submitError: {
     backgroundColor: '#fef2f2', borderRadius: 10, padding: 12,

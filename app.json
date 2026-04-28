@@ -38,7 +38,8 @@
           "defaultChannel": "default",
           "sounds": []
         }
-      ]
+      ],
+      "@react-native-community/datetimepicker"
     ],
     "extra": {
       "eas": {
