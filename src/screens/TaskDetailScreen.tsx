@@ -838,12 +838,10 @@ export default function TaskDetailScreen({ route, navigation }: Props) {
                 <View key={sub.id}>
                   <SubtaskRow
                     subtask={sub}
-                    toggling={togglingSubtaskId === sub.id}
                     settingStatus={settingStatusId === sub.id}
                     reassigningOwner={reassigningSubtask === sub.id}
                     notesCount={subtaskNotes[sub.id]?.length ?? 0}
                     expanded={expandedSubtaskId === sub.id}
-                    onToggle={() => handleToggleSubtask(sub.id)}
                     onSetStatus={() => handleSetSubtaskStatus(sub.id, sub.status)}
                     onToggleNotes={() => handleToggleNotes(sub.id)}
                     onDelete={() => handleDeleteSubtask(sub.id)}
@@ -1057,62 +1055,64 @@ function MetaRow({ label, value }: { label: string; value: string }) {
   )
 }
 
-function SubtaskRow({ subtask, toggling, settingStatus, reassigningOwner, notesCount, expanded, onToggle, onSetStatus, onToggleNotes, onDelete, onReassignOwner }: {
+function SubtaskRow({ subtask, settingStatus, reassigningOwner, notesCount, expanded, onSetStatus, onToggleNotes, onDelete, onReassignOwner }: {
   subtask: Subtask
-  toggling: boolean
   settingStatus: boolean
   reassigningOwner: boolean
   notesCount: number
   expanded: boolean
-  onToggle: () => void
   onSetStatus: () => void
   onToggleNotes: () => void
   onDelete: () => void
   onReassignOwner: () => void
 }) {
+  const statusColor = SUBTASK_STATUS_COLORS[subtask.status] ?? '#c4c6cd'
+  const statusIcon = subtask.status === 'DONE' ? '✅' : subtask.status === 'IN_PROGRESS' ? '🔄' : '⬜'
+
   return (
     <View style={[styles.subtaskRow, expanded && styles.subtaskRowExpanded]}>
-      {/* Checkbox */}
-      <TouchableOpacity onPress={onToggle} disabled={toggling} style={styles.subtaskCheck}>
-        {toggling
-          ? <ActivityIndicator size="small" color="#1a237e" />
-          : <Text style={{ fontSize: 18 }}>{subtask.isComplete ? '✅' : '⬜'}</Text>}
+
+      {/* Left: status icon — tap to change status */}
+      <TouchableOpacity onPress={onSetStatus} disabled={settingStatus} style={styles.subtaskStatusBtn}>
+        {settingStatus
+          ? <ActivityIndicator size="small" color={statusColor} />
+          : <Text style={{ fontSize: 20 }}>{statusIcon}</Text>}
       </TouchableOpacity>
 
-      {/* Title + status chip row */}
+      {/* Middle: title + owner */}
       <View style={styles.subtaskBody}>
-        <Text style={[styles.subtaskTitle, subtask.isComplete && styles.strikethrough]}>{subtask.title}</Text>
-        <TouchableOpacity onPress={onReassignOwner} disabled={reassigningOwner}>
+        <Text
+          style={[styles.subtaskTitle, subtask.status === 'DONE' && styles.strikethrough,
+            subtask.status === 'IN_PROGRESS' && { color: '#0d9488' }]}
+          numberOfLines={2}
+        >
+          {subtask.title}
+        </Text>
+        <TouchableOpacity onPress={onReassignOwner} disabled={reassigningOwner} style={{ marginTop: 2 }}>
           {reassigningOwner
-            ? <ActivityIndicator size="small" color="#006a66" style={{ marginVertical: 2 }} />
+            ? <ActivityIndicator size="small" color="#006a66" />
             : subtask.ownerName
-              ? <Text style={[styles.subtaskOwner, { color: '#006a66', textDecorationLine: 'underline' }]}>👤 {subtask.ownerName} ✎</Text>
-              : <Text style={[styles.subtaskOwner, { color: '#9aa0a6' }]}>👤 Assign owner ✎</Text>}
+              ? <View style={styles.subtaskOwnerRow}>
+                  <View style={styles.subtaskOwnerAvatar}>
+                    <Text style={styles.subtaskOwnerAvatarText}>{subtask.ownerName.charAt(0).toUpperCase()}</Text>
+                  </View>
+                  <Text style={styles.subtaskOwnerName}>{subtask.ownerName}</Text>
+                  <Text style={styles.subtaskOwnerEdit}>✎</Text>
+                </View>
+              : <Text style={styles.subtaskOwnerEmpty}>+ assign owner</Text>}
         </TouchableOpacity>
-        <View style={styles.subtaskActions}>
-          {/* Status chip — tap to change */}
-          <TouchableOpacity
-            onPress={onSetStatus}
-            disabled={settingStatus}
-            style={[styles.statusChip, { backgroundColor: (SUBTASK_STATUS_COLORS[subtask.status] ?? '#666') + '22' }]}
-          >
-            {settingStatus
-              ? <ActivityIndicator size="small" color={SUBTASK_STATUS_COLORS[subtask.status] ?? '#666'} />
-              : <Text style={[styles.statusChipText, { color: SUBTASK_STATUS_COLORS[subtask.status] ?? '#666' }]}>
-                  {subtask.status.replace('_', ' ')}
-                </Text>}
-          </TouchableOpacity>
-          {/* Notes toggle */}
-          <TouchableOpacity onPress={onToggleNotes} style={styles.notesBtn}>
-            <Text style={styles.notesBtnText}>{expanded ? '▲' : '🗒️'} Notes{notesCount > 0 ? ` (${notesCount})` : ''}</Text>
-          </TouchableOpacity>
-        </View>
       </View>
 
-      {/* Delete */}
-      <TouchableOpacity onPress={onDelete} style={styles.subtaskDel}>
-        <Text style={{ color: '#ba1a1a', fontSize: 16 }}>✕</Text>
-      </TouchableOpacity>
+      {/* Right: notes + delete */}
+      <View style={styles.subtaskRight}>
+        <TouchableOpacity onPress={onToggleNotes} style={styles.subtaskNotesBtn}>
+          <Text style={styles.subtaskNotesBtnText}>{expanded ? '▲' : '🗒️'}{notesCount > 0 ? ` ${notesCount}` : ''}</Text>
+        </TouchableOpacity>
+        <TouchableOpacity onPress={onDelete} style={styles.subtaskDelBtn}>
+          <Text style={styles.subtaskDelText}>✕</Text>
+        </TouchableOpacity>
+      </View>
+
     </View>
   )
 }
@@ -1237,14 +1237,29 @@ const styles = StyleSheet.create({
   // ── Subtasks ──
   subtaskRow: {
     flexDirection: 'row', alignItems: 'center',
-    backgroundColor: '#fff', borderRadius: 12, padding: 12,
+    backgroundColor: '#fff', borderRadius: 12, paddingVertical: 10, paddingHorizontal: 12,
     marginBottom: 8, borderWidth: 1, borderColor: '#e8eaed',
-    shadowColor: '#041627', shadowOpacity: 0.03, shadowRadius: 4, elevation: 0,
   },
-  subtaskCheck: { marginRight: 10 },
-  subtaskBody: { flex: 1 },
+  subtaskStatusBtn: { marginRight: 10, padding: 2 },
+  subtaskBody: { flex: 1, minWidth: 0 },
   subtaskTitle: { fontSize: 14, color: '#191c1e', fontWeight: '500', marginBottom: 2 },
-  subtaskOwner: { fontSize: 11, color: '#737c7f', marginBottom: 4 },
+  subtaskOwnerRow: { flexDirection: 'row', alignItems: 'center', gap: 5 },
+  subtaskOwnerAvatar: {
+    width: 18, height: 18, borderRadius: 9,
+    backgroundColor: 'rgba(0,106,102,0.15)', justifyContent: 'center', alignItems: 'center',
+  },
+  subtaskOwnerAvatarText: { fontSize: 9, fontWeight: '700', color: '#006a66' },
+  subtaskOwnerName: { fontSize: 11, color: '#737c7f' },
+  subtaskOwnerEdit: { fontSize: 10, color: '#c4c6cd' },
+  subtaskOwnerEmpty: { fontSize: 11, color: '#006a66', fontStyle: 'italic' },
+  subtaskRight: { flexDirection: 'row', alignItems: 'center', gap: 4, marginLeft: 8 },
+  subtaskNotesBtn: {
+    paddingHorizontal: 8, paddingVertical: 5,
+    borderRadius: 8, backgroundColor: '#e6f7f6',
+  },
+  subtaskNotesBtnText: { fontSize: 11, color: '#006a66', fontWeight: '600' },
+  subtaskDelBtn: { padding: 6 },
+  subtaskDelText: { color: '#ba1a1a', fontSize: 14 },
   ownerPickerBtn: {
     flexDirection: 'row', alignItems: 'center',
     backgroundColor: '#f0fdfb', borderRadius: 10, borderWidth: 1, borderColor: '#006a66' + '30',
@@ -1305,14 +1320,7 @@ const styles = StyleSheet.create({
   },
   ownerAvatarText: { color: '#fff', fontWeight: '700', fontSize: 14 },
   subtaskRowExpanded: { borderBottomLeftRadius: 0, borderBottomRightRadius: 0, marginBottom: 0 },
-  subtaskActions: { flexDirection: 'row', alignItems: 'center', gap: 8, flexWrap: 'wrap' },
-  statusChip: { borderRadius: 8, paddingHorizontal: 8, paddingVertical: 3, minWidth: 40 },
-  statusChipText: { fontSize: 11, fontWeight: '700' },
-  notesBtn: { paddingHorizontal: 8, paddingVertical: 3, borderRadius: 8, backgroundColor: '#e6f7f6' },
-  notesBtnText: { fontSize: 11, color: '#006a66', fontWeight: '600' },
   strikethrough: { textDecorationLine: 'line-through', color: '#9aa0a6' },
-  subtaskStatus: { fontSize: 11, fontWeight: '600', marginTop: 2 },
-  subtaskDel: { padding: 4 },
 
   // ── Notes panel ──
   notesPanel: {
