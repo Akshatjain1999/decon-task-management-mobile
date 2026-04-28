@@ -14,6 +14,12 @@ export async function registerPushToken(): Promise<void> {
     return
   }
 
+  // expo-notifications remote push was removed from Expo Go in SDK 53.
+  // Skip silently when running inside Expo Go so the app doesn't crash.
+  if (Constants.appOwnership === 'expo') {
+    return
+  }
+
   // Android requires an explicit notification channel
   if (Platform.OS === 'android') {
     await Notifications.setNotificationChannelAsync('default', {

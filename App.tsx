@@ -3,22 +3,25 @@ import { NavigationContainer } from '@react-navigation/native'
 import { Provider } from 'react-redux'
 import { SafeAreaProvider } from 'react-native-safe-area-context'
 import * as Notifications from 'expo-notifications'
+import Constants from 'expo-constants'
 import { store } from './src/store'
 import AppNavigator from './src/navigation/AppNavigator'
 import { useAppDispatch, useAppSelector } from './src/store/hooks'
 import { restoreSession } from './src/store/authSlice'
 import { registerPushToken } from './src/services/pushTokenService'
 
-// How notifications are displayed when the app is in the foreground
-Notifications.setNotificationHandler({
-  handleNotification: async () => ({
-    shouldShowAlert: true,
-    shouldPlaySound: true,
-    shouldSetBadge: true,
-    shouldShowBanner: true,
-    shouldShowList: true,
-  }),
-})
+// Only configure notification handler outside Expo Go (SDK 53+ requirement)
+if (Constants.appOwnership !== 'expo') {
+  Notifications.setNotificationHandler({
+    handleNotification: async () => ({
+      shouldShowAlert: true,
+      shouldPlaySound: true,
+      shouldSetBadge: true,
+      shouldShowBanner: true,
+      shouldShowList: true,
+    }),
+  })
+}
 
 function Root() {
   const dispatch = useAppDispatch()
