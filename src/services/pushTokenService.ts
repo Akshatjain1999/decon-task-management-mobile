@@ -1,26 +1,63 @@
 import * as Device from 'expo-device'
-import * as Notifications from 'expo-notifications'
 import Constants from 'expo-constants'
 import { Platform } from 'react-native'
 import api from './api'
 
+/** Returns true when running inside Expo Go (push is unsupported there since SDK 53). */
+function isExpoGo(): boolean {
+  return Constants.appOwnership === 'expo'
+}
+
 /**
- * Requests notification permission and registers the Expo Push Token with the backend.
- * Safe to call multiple times — returns early if no token obtained.
+ * Sets up foreground notification display behaviour.
+ * No-op when running in Expo Go.
+ */
+export function setupNotificationHandler(): void {
+  if (isExpoGo()) return
+  // Dynamic require so the module is never loaded in Expo Go
+  // eslint-disable-next-line @typescript-eslint/no-var-requires
+  const Notifications = require('expo-notifications')
+  Notifications.setNotificationHandler({
+    handleNotification: async () => ({
+      shouldShowAlert: true,
+      shouldPlaySound: true,
+      shouldSetBadge: true,
+      shouldShowBanner: true,
+      shouldShowList: true,
+    }),
+  })
+}
+
+/**
+ * Listens for notification taps and calls onTap(taskId) when the payload has a taskId.
+ * Returns undefined in Expo Go.
+ */
+export function addNotificationTapListener(
+  onTap: (taskId: string) => void,
+): { remove: () => void } | undefined {
+  if (isExpoGo()) return undefined
+  // eslint-disable-next-line @typescript-eslint/no-var-requires
+  const Notifications = require('expo-notifications')
+  const subscription = Notifications.addNotificationResponseReceivedListener(
+    (response: any) => {
+      const data = response?.notification?.request?.content?.data as Record<string, any>
+      if (data?.taskId) onTap(String(data.taskId))
+    },
+  )
+  return subscription
+}
+
+/**
+ * Requests notification permission, gets the Expo push token, and saves it to the backend.
+ * No-op when running in Expo Go or on a simulator.
  */
 export async function registerPushToken(): Promise<void> {
-  if (!Device.isDevice) {
-    // Push notifications do not work on simulators/emulators
-    return
-  }
+  if (isExpoGo()) return
+  if (!Device.isDevice) return
 
-  // expo-notifications remote push was removed from Expo Go in SDK 53.
-  // Skip silently when running inside Expo Go so the app doesn't crash.
-  if (Constants.appOwnership === 'expo') {
-    return
-  }
+  // eslint-disable-next-line @typescript-eslint/no-var-requires
+  const Notifications = require('expo-notifications')
 
-  // Android requires an explicit notification channel
   if (Platform.OS === 'android') {
     await Notifications.setNotificationChannelAsync('default', {
       name: 'Default',
@@ -33,27 +70,22 @@ export async function registerPushToken(): Promise<void> {
 
   const { status: existingStatus } = await Notifications.getPermissionsAsync()
   let finalStatus = existingStatus
-
   if (existingStatus !== 'granted') {
     const { status } = await Notifications.requestPermissionsAsync()
     finalStatus = status
   }
-
-  if (finalStatus !== 'granted') {
-    // User denied push notifications — silently skip
-    return
-  }
+  if (finalStatus !== 'granted') return
 
   const projectId =
     Constants.expoConfig?.extra?.eas?.projectId ?? '79d6d060-070a-4e52-aee6-86ed7e73f3a5'
 
   const tokenData = await Notifications.getExpoPushTokenAsync({ projectId })
-
   const token = tokenData.data
 
   try {
     await api.put('/api/v1/users/me/push-token', { token })
   } catch {
-    // Non-critical — app works fine without push tokens being saved
+    // Non-critical
   }
 }
+
