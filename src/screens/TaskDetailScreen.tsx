@@ -32,11 +32,11 @@ type Props = NativeStackScreenProps<RootStackParamList, 'TaskDetail'>
 type Tab = 'details' | 'subtasks' | 'comments' | 'activity'
 
 // ─── Constants ────────────────────────────────────────────────────────────────
-const STATUS_COLORS: Record<TaskStatus, string> = {
-  OPEN: '#1565C0',
-  IN_PROGRESS: '#E65100',
-  COMPLETED: '#2E7D32',
-  OVERDUE: '#ba1a1a',
+const STATUS_BADGE: Record<TaskStatus, { bg: string; text: string }> = {
+  OPEN:        { bg: '#e8f1fb', text: '#1a56a0' },
+  IN_PROGRESS: { bg: '#e6f7f6', text: '#006a66' },
+  COMPLETED:   { bg: '#edf7ed', text: '#166534' },
+  OVERDUE:     { bg: '#ffdad6', text: '#ba1a1a' },
 }
 
 const PRIORITY_COLORS: Record<string, { bg: string; text: string }> = {
@@ -50,6 +50,12 @@ const TASK_TYPE_LABELS: Record<string, string> = {
   CCTV_INSTALLATION: 'CCTV Installation',
   LIFT_INSTALLATION: 'Lift Installation',
   RACKS_INSTALLATION: 'Racks Installation',
+}
+
+const TASK_TYPE_ICONS: Record<string, string> = {
+  CCTV_INSTALLATION:  '📹',
+  LIFT_INSTALLATION:  '🛗',
+  RACKS_INSTALLATION: '🗄️',
 }
 
 const SUBTASK_STATUS_COLORS: Record<string, string> = {
@@ -214,10 +220,10 @@ export default function TaskDetailScreen({ route, navigation }: Props) {
     const options: TaskStatus[] = ['OPEN', 'IN_PROGRESS', 'COMPLETED']
     Alert.alert(
       'Change Status',
-      `Current: ${task?.status?.replace('_', ' ')}`,
+      `Current: ${task?.status?.replace(/_/g, ' ')}`,
       [
         ...options.map((s) => ({
-          text: s.replace('_', ' '),
+          text: s.replace(/_/g, ' '),
           onPress: () => changeStatus(s),
         })),
         { text: 'Cancel', style: 'cancel' },
@@ -422,6 +428,7 @@ export default function TaskDetailScreen({ route, navigation }: Props) {
   if (!task) return null
 
   const pColor = PRIORITY_COLORS[task.priority] ?? PRIORITY_COLORS.MEDIUM
+  const sBadge = STATUS_BADGE[task.status] ?? { bg: '#e0e3e5', text: '#44474c' }
   const completionPct = task.subtasksTotal > 0 ? Math.round((task.subtasksCompleted / task.subtasksTotal) * 100) : 0
 
   return (
@@ -506,44 +513,84 @@ export default function TaskDetailScreen({ route, navigation }: Props) {
       </Modal>
 
       <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
-        {/* ── Header card ─────────────────────────────────────────────── */}
-        <View style={styles.headerCard}>
-          <View style={styles.headerRow}>
-            <View style={styles.headerBadges}>
-              <View style={[styles.badge, { backgroundColor: STATUS_COLORS[task.status] }]}>
-                <Text style={styles.badgeWhite}>{task.status.replace('_', ' ')}</Text>
-              </View>
-              <View style={[styles.badge, { backgroundColor: pColor.bg }]}>
-                <Text style={[styles.badgeText, { color: pColor.text }]}>{task.priority}</Text>
-              </View>
+        {/* ── Hero Header ── */}
+        <View style={styles.heroCard}>
+          <View style={styles.heroContent}>
+            {/* Pills row */}
+            <View style={styles.pillsRow}>
               {task.taskType && (
-                <View style={[styles.badge, { backgroundColor: '#e8eaf6' }]}>
-                  <Text style={[styles.badgeText, { color: '#1a237e' }]}>{TASK_TYPE_LABELS[task.taskType] ?? task.taskType}</Text>
+                <View style={styles.pillGlass}>
+                  <Text style={styles.pillGlassText}>
+                    {TASK_TYPE_ICONS[task.taskType] ?? '📋'}  {TASK_TYPE_LABELS[task.taskType] ?? task.taskType}
+                  </Text>
                 </View>
               )}
+              <View style={[styles.heroPill, { backgroundColor: pColor.bg }]}>
+                <Text style={[styles.heroPillText, { color: pColor.text }]}>{task.priority}</Text>
+              </View>
+              <View style={[styles.heroPill, { backgroundColor: sBadge.bg }]}>
+                <Text style={[styles.heroPillText, { color: sBadge.text }]}>{task.status.replace('_', ' ')}</Text>
+              </View>
             </View>
-            {/* Actions */}
-            <View style={styles.headerActions}>
-              <TouchableOpacity style={styles.actionIcon} onPress={showStatusPicker} disabled={updatingStatus}>
-                {updatingStatus
-                  ? <ActivityIndicator size="small" color="#1a237e" />
-                  : <Text style={styles.actionIconText}>⚡</Text>}
-              </TouchableOpacity>
-              <TouchableOpacity style={[styles.actionIcon, { backgroundColor: '#ffebee' }]} onPress={handleDelete}>
-                <Text style={styles.actionIconText}>🗑️</Text>
-              </TouchableOpacity>
+
+            {/* Title */}
+            <Text style={styles.heroTitle}>{task.title}</Text>
+
+            {/* Tags */}
+            {task.tags?.length > 0 && (
+              <View style={styles.tagRow}>
+                {task.tags.map((tag) => (
+                  <View key={tag.id} style={[styles.tagChip, { backgroundColor: tag.color + '33', borderColor: tag.color + '55' }]}>
+                    <Text style={[styles.tagChipText, { color: tag.color }]}>{tag.name}</Text>
+                  </View>
+                ))}
+              </View>
+            )}
+
+            {/* Sub-meta row */}
+            <View style={styles.heroMeta}>
+              {task.createdBy && (
+                <Text style={styles.heroMetaItem}>
+                  <Text style={styles.heroMetaMuted}>Reporter  </Text>
+                  <Text style={styles.heroMetaBold}>{task.createdBy.name}</Text>
+                </Text>
+              )}
+              {task.assignedTo && (
+                <Text style={styles.heroMetaItem}>
+                  <Text style={styles.heroMetaMuted}>Assignee  </Text>
+                  <Text style={styles.heroMetaBold}>{task.assignedTo.name}</Text>
+                </Text>
+              )}
+              {task.dueDate && (
+                <Text style={styles.heroMetaItem}>
+                  <Text style={styles.heroMetaMuted}>Due  </Text>
+                  <Text style={styles.heroMetaBold}>{formatDate(task.dueDate)}</Text>
+                </Text>
+              )}
+              {task.subtasksTotal > 0 && (
+                <Text style={styles.heroMetaItem}>
+                  <Text style={styles.heroMetaBold}>{task.subtasksCompleted}/{task.subtasksTotal}</Text>
+                  <Text style={styles.heroMetaMuted}> subtasks</Text>
+                </Text>
+              )}
             </View>
           </View>
-          <Text style={styles.title}>{task.title}</Text>
-          {task.tags?.length > 0 && (
-            <View style={styles.tagRow}>
-              {task.tags.map((tag) => (
-                <View key={tag.id} style={[styles.tag, { backgroundColor: tag.color + '33' }]}>
-                  <Text style={[styles.tagText, { color: tag.color }]}>{tag.name}</Text>
-                </View>
-              ))}
-            </View>
-          )}
+
+          {/* Action bar */}
+          <View style={styles.heroActionBar}>
+            <TouchableOpacity
+              style={styles.heroActionBtn}
+              onPress={showStatusPicker}
+              disabled={updatingStatus}
+            >
+              {updatingStatus
+                ? <ActivityIndicator size="small" color="rgba(255,255,255,0.85)" />
+                : <Text style={styles.heroActionBtnText}>⚡ Change Status</Text>}
+            </TouchableOpacity>
+            <TouchableOpacity style={styles.heroDeleteBtn} onPress={handleDelete}>
+              <Text style={styles.heroDeleteBtnText}>🗑 Delete</Text>
+            </TouchableOpacity>
+          </View>
         </View>
 
         {/* ── Tabs ────────────────────────────────────────────────────── */}
@@ -887,228 +934,255 @@ function SubtaskRow({ subtask, toggling, settingStatus, notesCount, expanded, on
 
 function CommentCard({ comment, isOwn, onDelete }: { comment: Comment; isOwn: boolean; onDelete: () => void }) {
   return (
-    <View style={styles.commentCard}>
-      <View style={styles.commentHeader}>
-        <View style={styles.commentAvatar}>
-          <Text style={styles.commentAvatarText}>{comment.user?.name?.charAt(0)?.toUpperCase() ?? '?'}</Text>
-        </View>
-        <View style={{ flex: 1 }}>
-          <Text style={styles.commentAuthor}>{comment.user?.name ?? 'Unknown'}</Text>
-          <Text style={styles.commentTime}>{timeAgo(comment.createdAt)}</Text>
+    <View style={styles.commentBubbleRow}>
+      <View style={styles.commentBubbleAvatar}>
+        <Text style={styles.commentBubbleAvatarText}>{comment.user?.name?.charAt(0)?.toUpperCase() ?? '?'}</Text>
+      </View>
+      <View style={{ flex: 1, minWidth: 0 }}>
+        <View style={styles.commentBubble}>
+          <View style={styles.commentBubbleHeader}>
+            <Text style={styles.commentBubbleAuthor}>{comment.user?.name ?? 'Unknown'}</Text>
+            <Text style={styles.commentBubbleTime}>{timeAgo(comment.createdAt)}</Text>
+          </View>
+          <Text style={styles.commentBubbleContent}>{comment.content}</Text>
         </View>
         {isOwn && (
-          <TouchableOpacity onPress={onDelete}>
-            <Text style={{ color: '#ba1a1a', fontSize: 13 }}>Delete</Text>
+          <TouchableOpacity onPress={onDelete} style={{ alignSelf: 'flex-end', marginTop: 3, paddingHorizontal: 4 }}>
+            <Text style={{ fontSize: 11, color: '#ba1a1a', fontWeight: '600' }}>Delete</Text>
           </TouchableOpacity>
         )}
       </View>
-      <Text style={styles.commentContent}>{comment.content}</Text>
     </View>
   )
 }
 
 // ─── Styles ───────────────────────────────────────────────────────────────────
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#f0f4ff' },
+  container: { flex: 1, backgroundColor: '#f7f9fb' },
   center: { flex: 1, justifyContent: 'center', alignItems: 'center' },
 
-  // Header
-  headerCard: {
-    backgroundColor: '#1a237e',
-    padding: 16,
-    paddingTop: 12,
+  // ── Hero Header ──
+  heroCard: { backgroundColor: '#041627' },
+  heroContent: { padding: 16, paddingTop: 14, paddingBottom: 12 },
+  pillsRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginBottom: 14 },
+  pillGlass: {
+    paddingHorizontal: 10, paddingVertical: 4, borderRadius: 20,
+    backgroundColor: 'rgba(255,255,255,0.10)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.12)',
   },
-  headerRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 10 },
-  headerBadges: { flexDirection: 'row', flexWrap: 'wrap', gap: 6, flex: 1 },
-  headerActions: { flexDirection: 'row', gap: 8, marginLeft: 8 },
-  actionIcon: {
-    width: 34, height: 34, borderRadius: 8,
-    backgroundColor: 'rgba(255,255,255,0.15)',
-    justifyContent: 'center', alignItems: 'center',
+  pillGlassText: { fontSize: 11, fontWeight: '700', color: 'rgba(255,255,255,0.80)' },
+  heroPill: { paddingHorizontal: 10, paddingVertical: 4, borderRadius: 20 },
+  heroPillText: { fontSize: 11, fontWeight: '700', letterSpacing: 0.4 },
+  heroTitle: {
+    fontSize: 22, fontWeight: '800', color: '#fff', lineHeight: 30,
+    marginBottom: 10, letterSpacing: -0.3,
   },
-  actionIconText: { fontSize: 16 },
-  badge: { borderRadius: 6, paddingHorizontal: 8, paddingVertical: 3 },
-  badgeWhite: { color: '#fff', fontSize: 11, fontWeight: '700' },
-  badgeText: { fontSize: 11, fontWeight: '700' },
-  title: { fontSize: 18, fontWeight: '700', color: '#fff', lineHeight: 24, marginBottom: 8 },
-  tagRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 6 },
-  tag: { borderRadius: 12, paddingHorizontal: 8, paddingVertical: 2 },
-  tagText: { fontSize: 11, fontWeight: '600' },
+  tagRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginBottom: 10 },
+  tagChip: { paddingHorizontal: 8, paddingVertical: 3, borderRadius: 12, borderWidth: 1 },
+  tagChipText: { fontSize: 11, fontWeight: '600' },
+  heroMeta: { flexDirection: 'row', flexWrap: 'wrap', gap: 10 },
+  heroMetaItem: { fontSize: 11 },
+  heroMetaMuted: { color: 'rgba(255,255,255,0.45)' },
+  heroMetaBold: { color: 'rgba(255,255,255,0.85)', fontWeight: '600' },
+  heroActionBar: {
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
+    paddingHorizontal: 14, paddingVertical: 10,
+    borderTopWidth: 1, borderTopColor: 'rgba(255,255,255,0.08)',
+    backgroundColor: 'rgba(0,0,0,0.20)',
+  },
+  heroActionBtn: {
+    flexDirection: 'row', alignItems: 'center', gap: 6,
+    paddingHorizontal: 14, paddingVertical: 8, borderRadius: 10,
+    borderWidth: 1, backgroundColor: 'rgba(255,255,255,0.08)',
+    borderColor: 'rgba(255,255,255,0.12)',
+  },
+  heroActionBtnText: { fontSize: 12, fontWeight: '700', color: 'rgba(255,255,255,0.85)' },
+  heroDeleteBtn: {
+    paddingHorizontal: 12, paddingVertical: 8, borderRadius: 10,
+    borderWidth: 1, backgroundColor: 'rgba(186,26,26,0.10)',
+    borderColor: 'rgba(186,26,26,0.22)',
+  },
+  heroDeleteBtnText: { fontSize: 12, fontWeight: '700', color: '#ff8a80' },
 
-  // Tabs
+  // ── Tabs ──
   tabBar: {
-    flexDirection: 'row',
-    backgroundColor: '#fff',
-    borderBottomWidth: 1,
-    borderBottomColor: '#e0e0e0',
+    flexDirection: 'row', backgroundColor: '#fff',
+    borderBottomWidth: 1, borderBottomColor: '#e0e3e5',
   },
   tab: {
     flex: 1, paddingVertical: 12,
     alignItems: 'center', justifyContent: 'center',
     borderBottomWidth: 2, borderBottomColor: 'transparent',
   },
-  tabActive: { borderBottomColor: '#1a237e' },
-  tabText: { fontSize: 11, fontWeight: '600', color: '#888' },
-  tabTextActive: { color: '#1a237e' },
+  tabActive: { borderBottomColor: '#006a66' },
+  tabText: { fontSize: 11, fontWeight: '600', color: '#9aa0a6' },
+  tabTextActive: { color: '#006a66' },
 
-  // Body
+  // ── Body ──
   body: { flex: 1 },
   bodyContent: { padding: 16, paddingBottom: 40 },
 
-  // Section
+  // ── Section cards ──
   section: {
-    backgroundColor: '#fff', borderRadius: 12, padding: 16,
+    backgroundColor: '#fff', borderRadius: 16, padding: 16,
     marginBottom: 12, elevation: 1,
-    shadowColor: '#000', shadowOpacity: 0.04, shadowRadius: 4,
+    shadowColor: '#041627', shadowOpacity: 0.05, shadowRadius: 8,
+    shadowOffset: { width: 0, height: 2 },
+    borderWidth: 1, borderColor: '#e8eaed',
   },
-  sectionTitle: { fontSize: 13, fontWeight: '700', color: '#1a237e', marginBottom: 10 },
-  descText: { fontSize: 14, color: '#444', lineHeight: 22 },
+  sectionTitle: {
+    fontSize: 9, fontWeight: '700', letterSpacing: 1.4,
+    color: '#9aa0a6', textTransform: 'uppercase', marginBottom: 12,
+  },
+  descText: { fontSize: 14, color: '#44474c', lineHeight: 22 },
 
-  // Meta
+  // ── Meta ──
   metaRow: {
     flexDirection: 'row', justifyContent: 'space-between',
-    paddingVertical: 7, borderBottomWidth: 1, borderBottomColor: '#f5f5f5',
+    paddingVertical: 8, borderBottomWidth: 1, borderBottomColor: '#f5f6f8',
   },
-  metaLabel: { fontSize: 13, color: '#888', fontWeight: '500' },
-  metaValue: { fontSize: 13, color: '#222', fontWeight: '600', maxWidth: '55%', textAlign: 'right' },
+  metaLabel: { fontSize: 13, color: '#9aa0a6', fontWeight: '500' },
+  metaValue: { fontSize: 13, color: '#191c1e', fontWeight: '600', maxWidth: '55%', textAlign: 'right' },
 
-  // Progress
+  // ── Progress ──
   progressRow: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 8 },
-  progressLabel: { fontSize: 12, color: '#666', fontWeight: '600' },
-  progressBg: { height: 6, backgroundColor: '#eee', borderRadius: 3, overflow: 'hidden', marginBottom: 4 },
-  progressFill: { height: 6, backgroundColor: '#2e7d32', borderRadius: 3 },
+  progressLabel: { fontSize: 12, color: '#44474c', fontWeight: '600' },
+  progressBg: { height: 5, backgroundColor: '#e8eaed', borderRadius: 3, overflow: 'hidden', marginBottom: 4 },
+  progressFill: { height: 5, backgroundColor: '#006a66', borderRadius: 3 },
 
-  // Subtasks
+  // ── Subtasks ──
   subtaskRow: {
     flexDirection: 'row', alignItems: 'center',
-    backgroundColor: '#fff', borderRadius: 10, padding: 12,
-    marginBottom: 8, elevation: 1,
+    backgroundColor: '#fff', borderRadius: 12, padding: 12,
+    marginBottom: 8, borderWidth: 1, borderColor: '#e8eaed',
+    shadowColor: '#041627', shadowOpacity: 0.03, shadowRadius: 4, elevation: 0,
   },
   subtaskCheck: { marginRight: 10 },
   subtaskBody: { flex: 1 },
-  subtaskTitle: { fontSize: 14, color: '#222', fontWeight: '500', marginBottom: 2 },
-  subtaskOwner: { fontSize: 11, color: '#546e7a', marginBottom: 4 },
+  subtaskTitle: { fontSize: 14, color: '#191c1e', fontWeight: '500', marginBottom: 2 },
+  subtaskOwner: { fontSize: 11, color: '#737c7f', marginBottom: 4 },
   ownerPickerBtn: {
     flexDirection: 'row', alignItems: 'center',
-    backgroundColor: '#e8eaf6', borderRadius: 8,
+    backgroundColor: '#f0fdfb', borderRadius: 10, borderWidth: 1, borderColor: '#006a66' + '30',
     paddingHorizontal: 10, paddingVertical: 7,
   },
-  ownerPickerText: { fontSize: 13, color: '#1a237e', flex: 1 },
+  ownerPickerText: { fontSize: 13, color: '#006a66', flex: 1 },
   statusDot: { width: 10, height: 10, borderRadius: 5, marginRight: 4 },
   ownerModal: {
-    backgroundColor: '#fff',
-    borderTopLeftRadius: 20, borderTopRightRadius: 20,
+    backgroundColor: '#fff', borderTopLeftRadius: 24, borderTopRightRadius: 24,
     paddingBottom: 32, paddingHorizontal: 16, paddingTop: 12,
   },
   ownerModalHandle: {
-    width: 40, height: 4, backgroundColor: '#ddd',
+    width: 40, height: 4, backgroundColor: '#e0e3e5',
     borderRadius: 2, alignSelf: 'center', marginBottom: 14,
   },
-  ownerModalTitle: { fontSize: 16, fontWeight: '700', color: '#1a237e', marginBottom: 10 },
+  ownerModalTitle: { fontSize: 16, fontWeight: '700', color: '#006a66', marginBottom: 10 },
   ownerModalItem: {
     flexDirection: 'row', alignItems: 'center', gap: 10,
-    paddingVertical: 12, paddingHorizontal: 8,
-    borderRadius: 8, marginBottom: 2,
+    paddingVertical: 12, paddingHorizontal: 8, borderRadius: 10, marginBottom: 2,
   },
-  ownerModalItemSelected: { backgroundColor: '#e8eaf6' },
-  ownerModalItemText: { fontSize: 14, color: '#222' },
-  ownerModalItemSub: { fontSize: 11, color: '#888', marginTop: 1 },
+  ownerModalItemSelected: { backgroundColor: '#e6f7f6' },
+  ownerModalItemText: { fontSize: 14, color: '#191c1e' },
+  ownerModalItemSub: { fontSize: 11, color: '#9aa0a6', marginTop: 1 },
   ownerAvatar: {
     width: 34, height: 34, borderRadius: 17,
-    backgroundColor: '#1a237e', justifyContent: 'center', alignItems: 'center',
+    backgroundColor: '#006a66', justifyContent: 'center', alignItems: 'center',
   },
   ownerAvatarText: { color: '#fff', fontWeight: '700', fontSize: 14 },
   subtaskRowExpanded: { borderBottomLeftRadius: 0, borderBottomRightRadius: 0, marginBottom: 0 },
   subtaskActions: { flexDirection: 'row', alignItems: 'center', gap: 8, flexWrap: 'wrap' },
-  statusChip: { borderRadius: 6, paddingHorizontal: 8, paddingVertical: 3, minWidth: 40 },
+  statusChip: { borderRadius: 8, paddingHorizontal: 8, paddingVertical: 3, minWidth: 40 },
   statusChipText: { fontSize: 11, fontWeight: '700' },
-  notesBtn: { paddingHorizontal: 6, paddingVertical: 3, borderRadius: 6, backgroundColor: '#f0f4ff' },
-  notesBtnText: { fontSize: 11, color: '#1a237e', fontWeight: '600' },
-  strikethrough: { textDecorationLine: 'line-through', color: '#aaa' },
+  notesBtn: { paddingHorizontal: 8, paddingVertical: 3, borderRadius: 8, backgroundColor: '#e6f7f6' },
+  notesBtnText: { fontSize: 11, color: '#006a66', fontWeight: '600' },
+  strikethrough: { textDecorationLine: 'line-through', color: '#9aa0a6' },
   subtaskStatus: { fontSize: 11, fontWeight: '600', marginTop: 2 },
   subtaskDel: { padding: 4 },
 
-  // Notes panel
+  // ── Notes panel ──
   notesPanel: {
-    backgroundColor: '#f7f9ff', borderWidth: 1, borderTopWidth: 0,
-    borderColor: '#e0e0e0', borderBottomLeftRadius: 10, borderBottomRightRadius: 10,
+    backgroundColor: '#fafcfd', borderWidth: 1, borderTopWidth: 0,
+    borderColor: '#e8eaed', borderBottomLeftRadius: 12, borderBottomRightRadius: 12,
     padding: 12, marginBottom: 8,
   },
   noteRow: { flexDirection: 'row', gap: 8, marginBottom: 10, alignItems: 'flex-start' },
   noteAvatar: {
     width: 26, height: 26, borderRadius: 13,
-    backgroundColor: '#1a237e', justifyContent: 'center', alignItems: 'center', flexShrink: 0,
+    backgroundColor: '#006a66', justifyContent: 'center', alignItems: 'center', flexShrink: 0,
   },
   noteAvatarText: { color: '#fff', fontWeight: '700', fontSize: 11 },
-  noteAuthor: { fontSize: 12, fontWeight: '700', color: '#222' },
-  noteText: { fontSize: 13, color: '#333', marginTop: 1 },
-  noteMeta: { fontSize: 10, color: '#aaa', marginTop: 2 },
-  noteEmpty: { fontSize: 12, color: '#aaa', textAlign: 'center', marginVertical: 8 },
+  noteAuthor: { fontSize: 12, fontWeight: '700', color: '#191c1e' },
+  noteText: { fontSize: 13, color: '#44474c', marginTop: 1 },
+  noteMeta: { fontSize: 10, color: '#9aa0a6', marginTop: 2 },
+  noteEmpty: { fontSize: 12, color: '#9aa0a6', textAlign: 'center', marginVertical: 8 },
   attachmentChip: {
-    flexDirection: 'row', alignItems: 'center',
-    backgroundColor: '#e8eaf6', borderRadius: 6,
-    paddingHorizontal: 6, paddingVertical: 2,
+    flexDirection: 'row', alignItems: 'center', backgroundColor: '#e6f7f6',
+    borderRadius: 8, paddingHorizontal: 8, paddingVertical: 3,
     alignSelf: 'flex-start', marginTop: 4,
   },
-  attachmentChipText: { fontSize: 11, color: '#1a237e' },
+  attachmentChipText: { fontSize: 11, color: '#006a66' },
   attachmentPreview: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
-    backgroundColor: '#e8eaf6', borderRadius: 8,
+    backgroundColor: '#e6f7f6', borderRadius: 8,
     paddingHorizontal: 10, paddingVertical: 6, marginBottom: 6,
   },
-  attachmentPreviewText: { fontSize: 12, color: '#1a237e', flex: 1, marginRight: 8 },
+  attachmentPreviewText: { fontSize: 12, color: '#006a66', flex: 1, marginRight: 8 },
 
-  // Add row
+  // ── Add row ──
   addRow: { flexDirection: 'row', gap: 8, marginTop: 8 },
   addInput: {
-    flex: 1, backgroundColor: '#fff', borderRadius: 10,
+    flex: 1, backgroundColor: '#fff', borderRadius: 12,
     paddingHorizontal: 12, paddingVertical: 10,
-    fontSize: 14, color: '#222',
-    borderWidth: 1, borderColor: '#e0e0e0',
+    fontSize: 14, color: '#191c1e',
+    borderWidth: 1, borderColor: '#e0e3e5',
   },
   addBtn: {
-    backgroundColor: '#1a237e', borderRadius: 10,
+    backgroundColor: '#006a66', borderRadius: 12,
     paddingHorizontal: 16, justifyContent: 'center',
     minWidth: 60, alignItems: 'center',
   },
   addBtnText: { color: '#fff', fontWeight: '700', fontSize: 13 },
 
-  // Comments
-  commentCard: {
-    backgroundColor: '#fff', borderRadius: 12, padding: 14,
-    marginBottom: 10, elevation: 1,
+  // ── Comments (bubble style) ──
+  commentBubbleRow: { flexDirection: 'row', gap: 10, marginBottom: 14, alignItems: 'flex-start' },
+  commentBubbleAvatar: {
+    width: 34, height: 34, borderRadius: 17,
+    backgroundColor: '#006a66', justifyContent: 'center', alignItems: 'center', flexShrink: 0,
   },
-  commentHeader: { flexDirection: 'row', alignItems: 'flex-start', marginBottom: 8, gap: 10 },
-  commentAvatar: {
-    width: 32, height: 32, borderRadius: 16,
-    backgroundColor: '#1a237e', justifyContent: 'center', alignItems: 'center',
+  commentBubbleAvatarText: { color: '#fff', fontWeight: '700', fontSize: 13 },
+  commentBubble: {
+    backgroundColor: '#f8f9fa', borderRadius: 16, borderTopLeftRadius: 4,
+    paddingHorizontal: 14, paddingVertical: 10,
+    borderWidth: 1, borderColor: '#eceef0',
   },
-  commentAvatarText: { color: '#fff', fontWeight: '700', fontSize: 13 },
-  commentAuthor: { fontSize: 13, fontWeight: '700', color: '#222' },
-  commentTime: { fontSize: 11, color: '#888', marginTop: 1 },
-  commentContent: { fontSize: 14, color: '#333', lineHeight: 20 },
+  commentBubbleHeader: {
+    flexDirection: 'row', justifyContent: 'space-between',
+    alignItems: 'center', marginBottom: 5, gap: 8,
+  },
+  commentBubbleAuthor: { fontSize: 12, fontWeight: '700', color: '#191c1e' },
+  commentBubbleTime: { fontSize: 10, color: '#9aa0a6' },
+  commentBubbleContent: { fontSize: 14, color: '#44474c', lineHeight: 20 },
   commentInputRow: { flexDirection: 'row', gap: 8, marginTop: 8, alignItems: 'flex-end' },
   commentInput: {
-    flex: 1, backgroundColor: '#fff', borderRadius: 10,
+    flex: 1, backgroundColor: '#fff', borderRadius: 12,
     paddingHorizontal: 12, paddingVertical: 10,
-    fontSize: 14, color: '#222',
-    borderWidth: 1, borderColor: '#e0e0e0',
+    fontSize: 14, color: '#191c1e',
+    borderWidth: 1, borderColor: '#e0e3e5',
     maxHeight: 100,
   },
 
-  // Audit
+  // ── Audit ──
   auditRow: { flexDirection: 'row', marginBottom: 14, gap: 12 },
   auditDot: {
     width: 10, height: 10, borderRadius: 5,
-    backgroundColor: '#1a237e', marginTop: 4, flexShrink: 0,
+    backgroundColor: '#006a66', marginTop: 4, flexShrink: 0,
   },
   auditBody: { flex: 1 },
-  auditType: { fontSize: 13, fontWeight: '700', color: '#222', marginBottom: 2 },
-  auditChange: { fontSize: 12, color: '#555', marginBottom: 2 },
+  auditType: { fontSize: 13, fontWeight: '700', color: '#191c1e', marginBottom: 2 },
+  auditChange: { fontSize: 12, color: '#44474c', marginBottom: 2 },
   auditOld: { color: '#ba1a1a', textDecorationLine: 'line-through' },
-  auditNew: { color: '#2e7d32', fontWeight: '600' },
-  auditMeta: { fontSize: 11, color: '#999' },
+  auditNew: { color: '#006a66', fontWeight: '600' },
+  auditMeta: { fontSize: 11, color: '#9aa0a6' },
 
-  empty: { textAlign: 'center', color: '#aaa', marginTop: 32, fontSize: 14 },
+  empty: { textAlign: 'center', color: '#9aa0a6', marginTop: 32, fontSize: 14 },
 })
 
