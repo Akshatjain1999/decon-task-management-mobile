@@ -733,10 +733,16 @@ export default function TaskDetailScreen({ route, navigation }: Props) {
       </Modal>
 
       {/* ── Subtask detail bottom-sheet ──────────────────────────── */}
+      {(() => {
+        const selectedSubtask = selectedSubtaskId != null
+          ? task.subtasks.find((s) => s.id === selectedSubtaskId)
+          : undefined
+        if (!selectedSubtask) return null
+        return (
       <SubtaskDetailSheet
-        visible={selectedSubtaskId !== null}
+        visible={true}
         taskId={taskId}
-        subtask={task.subtasks.find((s) => s.id === selectedSubtaskId) ?? null}
+        subtask={selectedSubtask}
         users={users}
         currentUserId={currentUser?.userId}
         isAdmin={(currentUser?.role ?? '').toUpperCase().includes('ADMIN')}
@@ -758,6 +764,8 @@ export default function TaskDetailScreen({ route, navigation }: Props) {
         }}
         showToast={showToast}
       />
+        )
+      })()}
 
       <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
         {/* ── Hero Header ── */}

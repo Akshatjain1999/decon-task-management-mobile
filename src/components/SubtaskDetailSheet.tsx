@@ -72,7 +72,7 @@ function renderWithMentions(text: string): React.ReactNode {
 interface Props {
   visible: boolean
   taskId: number
-  subtask: Subtask | null
+  subtask: Subtask
   users: User[]
   currentUserId: number | undefined
   isAdmin: boolean
@@ -136,7 +136,7 @@ export default function SubtaskDetailSheet({
 
   // Reset state when subtask changes / sheet opens
   useEffect(() => {
-    if (!visible || !subtask) return
+    if (!visible) return
     setTab('details')
     setTitle(subtask.title)
     setDescription(subtask.description ?? '')
@@ -151,11 +151,11 @@ export default function SubtaskDetailSheet({
     setPendingMentionIds([])
     setMentionTrigger(null)
     setNotes([])
-  }, [visible, subtask?.id])
+  }, [visible, subtask.id])
 
   // Load notes when notes tab opens
   useEffect(() => {
-    if (!visible || !subtask || tab !== 'notes' || notes.length > 0 || notesLoading) return
+    if (!visible || tab !== 'notes' || notes.length > 0 || notesLoading) return
     let cancel = false
     setNotesLoading(true)
     taskService.getSubtaskNotes(subtask.id)
@@ -163,9 +163,7 @@ export default function SubtaskDetailSheet({
       .catch((e: any) => { if (!cancel) showToast(e?.message || 'Failed to load notes') })
       .finally(() => { if (!cancel) setNotesLoading(false) })
     return () => { cancel = true }
-  }, [visible, subtask?.id, tab])
-
-  if (!subtask) return null
+  }, [visible, subtask.id, tab])
 
   // ── Save helpers ──────────────────────────────────────────────────────
   const persist = async (
