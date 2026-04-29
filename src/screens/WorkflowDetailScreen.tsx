@@ -24,10 +24,12 @@ const TASK_TYPE_META: Record<string, { label: string; color: string; bg: string;
 }
 
 const FILTER_META: Record<string, { label: string; bg: string; text: string; accent: string; description: string }> = {
-  WCC_PENDING:       { label: 'WCC Pending',       bg: '#fff8e1', text: '#b45309', accent: '#fde68a', description: 'Installation complete — waiting for WCC to be done.' },
-  WCC_COMPLETED:     { label: 'WCC Completed',     bg: '#dcfce7', text: '#166534', accent: '#86efac', description: 'WCC has been completed on these tasks.' },
-  BILLING_PENDING:   { label: 'Billing Pending',   bg: '#fef2f2', text: '#ba1a1a', accent: '#fca5a5', description: 'WCC done — waiting for billing to be completed.' },
-  BILLING_COMPLETED: { label: 'Billing Completed', bg: '#f0fdf4', text: '#15803d', accent: '#4ade80', description: 'Billing has been completed on these tasks.' },
+  WCC_PENDING:                { label: 'WCC Pending',       bg: '#fff8e1', text: '#b45309', accent: '#fde68a', description: 'Installation complete — waiting for WCC to be done.' },
+  WCC_COMPLETED:              { label: 'WCC Completed',     bg: '#dcfce7', text: '#166534', accent: '#86efac', description: 'WCC has been completed on these tasks.' },
+  BILLING_PENDING:            { label: 'Billing Pending',   bg: '#fef2f2', text: '#ba1a1a', accent: '#fca5a5', description: 'WCC done — waiting for billing to be completed.' },
+  BILLING_COMPLETED:          { label: 'Billing Completed', bg: '#f0fdf4', text: '#15803d', accent: '#4ade80', description: 'Billing has been completed on these tasks.' },
+  LIVE_COMPLETED:             { label: 'Live',              bg: '#ecfeff', text: '#0e7490', accent: '#67e8f9', description: 'Tasks that have gone live.' },
+  PENDING_MATERIAL_COMPLETED: { label: 'Pending Material Done', bg: '#fffbeb', text: '#92400e', accent: '#fcd34d', description: 'Pending material has been delivered for these tasks.' },
 }
 
 const STATUS_COLORS: Record<string, { bg: string; text: string }> = {

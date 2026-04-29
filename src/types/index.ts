@@ -41,6 +41,10 @@ export interface Subtask {
   createdAt: string
   ownerId?: number | null
   ownerName?: string | null
+  statusChangedAt?: string | null
+  completedAt?: string | null
+  dueDate?: string | null              // ISO yyyy-MM-dd
+  estimatedMinutes?: number | null
 }
 
 export interface SubtaskNote {
@@ -199,6 +203,8 @@ export interface WccBillingStats {
   wccCompleted: number
   billingPending: number
   billingCompleted: number
+  liveCompleted?: number
+  pendingMaterialCompleted?: number
 }
 
 export interface TaskTypeBreakdown {

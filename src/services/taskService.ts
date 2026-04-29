@@ -48,9 +48,17 @@ export const taskService = {
   },
 
   // ── Subtasks ────────────────────────────────────────────────────────────
-  async createSubtask(taskId: number, title: string, ownerId?: number | null): Promise<Subtask> {
+  async createSubtask(
+    taskId: number,
+    title: string,
+    ownerId?: number | null,
+    dueDate?: string | null,
+    estimatedMinutes?: number | null,
+  ): Promise<Subtask> {
     const body: Record<string, unknown> = { title }
     if (ownerId) body.ownerId = ownerId
+    if (dueDate) body.dueDate = dueDate
+    if (estimatedMinutes != null) body.estimatedMinutes = estimatedMinutes
     const res = await api.post<Subtask>(`/api/v1/tasks/${taskId}/subtasks`, body)
     return res.data
   },
@@ -67,8 +75,20 @@ export const taskService = {
     return res.data
   },
 
-  async updateSubtask(taskId: number, subtaskId: number, title: string, ownerId?: number | null): Promise<Subtask> {
-    const res = await api.put<Subtask>(`/api/v1/tasks/${taskId}/subtasks/${subtaskId}`, { title, ownerId: ownerId ?? null })
+  async updateSubtask(
+    taskId: number,
+    subtaskId: number,
+    title: string,
+    ownerId?: number | null,
+    dueDate?: string | null,
+    estimatedMinutes?: number | null,
+  ): Promise<Subtask> {
+    const res = await api.put<Subtask>(`/api/v1/tasks/${taskId}/subtasks/${subtaskId}`, {
+      title,
+      ownerId: ownerId ?? null,
+      dueDate: dueDate || null,
+      estimatedMinutes: estimatedMinutes ?? null,
+    })
     return res.data
   },
 

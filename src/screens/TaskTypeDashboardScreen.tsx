@@ -422,6 +422,39 @@ export default function TaskTypeDashboardScreen() {
                 </TouchableOpacity>
               ))}
             </View>
+
+            {/* Completion highlights — Live / Pending Material (when available) */}
+            {(data.wccBillingStats.liveCompleted != null || data.wccBillingStats.pendingMaterialCompleted != null) && (
+              <>
+                <Text style={styles.sectionTitle}>COMPLETION HIGHLIGHTS</Text>
+                <View style={styles.wccGrid}>
+                  {data.wccBillingStats.liveCompleted != null && (
+                    <TouchableOpacity
+                      onPress={() => navigation.navigate('WorkflowDetail', { typeKey, filter: 'LIVE_COMPLETED' })}
+                      activeOpacity={0.75}
+                      style={styles.wccCard}
+                    >
+                      <Text style={styles.wccValue}>{data.wccBillingStats.liveCompleted}</Text>
+                      <Text style={[styles.wccLabel, { color: '#0e7490' }]}>{typeKey === 'CCTV_INSTALLATION' ? 'Live' : 'Live'}</Text>
+                      <View style={[styles.wccAccent, { backgroundColor: '#67e8f9' }]} />
+                      <Text style={[styles.wccArrow, { color: '#0e7490' }]}>›</Text>
+                    </TouchableOpacity>
+                  )}
+                  {data.wccBillingStats.pendingMaterialCompleted != null && (
+                    <TouchableOpacity
+                      onPress={() => navigation.navigate('WorkflowDetail', { typeKey, filter: 'PENDING_MATERIAL_COMPLETED' })}
+                      activeOpacity={0.75}
+                      style={styles.wccCard}
+                    >
+                      <Text style={styles.wccValue}>{data.wccBillingStats.pendingMaterialCompleted}</Text>
+                      <Text style={[styles.wccLabel, { color: '#92400e' }]}>Pending Material Done</Text>
+                      <View style={[styles.wccAccent, { backgroundColor: '#fcd34d' }]} />
+                      <Text style={[styles.wccArrow, { color: '#92400e' }]}>›</Text>
+                    </TouchableOpacity>
+                  )}
+                </View>
+              </>
+            )}
           </>
         )}
 

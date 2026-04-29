@@ -189,6 +189,14 @@ function WccBillingCard({ typeKey, breakdown }: { typeKey: string; breakdown: Ta
     { label: 'Billing Completed', value: wb.billingCompleted, text: '#15803d', accent: '#4ade80' },
   ]
 
+  const highlightCards: { label: string; value: number; text: string; accent: string }[] = []
+  if (wb.liveCompleted != null) {
+    highlightCards.push({ label: 'Live', value: wb.liveCompleted, text: '#0e7490', accent: '#67e8f9' })
+  }
+  if (wb.pendingMaterialCompleted != null) {
+    highlightCards.push({ label: 'Pending Material Done', value: wb.pendingMaterialCompleted, text: '#92400e', accent: '#fcd34d' })
+  }
+
   return (
     <View style={styles.wccCard}>
       <View style={[styles.wccCardHeader, { backgroundColor: meta.bg }]}>
@@ -211,6 +219,23 @@ function WccBillingCard({ typeKey, breakdown }: { typeKey: string; breakdown: Ta
           </View>
         ))}
       </View>
+      {highlightCards.length > 0 && (
+        <View style={[styles.wccGrid, { borderTopWidth: 1, borderTopColor: '#eceef0' }]}>
+          {highlightCards.map((c, idx) => (
+            <View
+              key={c.label}
+              style={[
+                styles.wccMiniCard,
+                idx > 0 && { borderLeftWidth: 1, borderLeftColor: '#eceef0' },
+              ]}
+            >
+              <Text style={styles.wccMiniValue}>{c.value}</Text>
+              <Text style={[styles.wccMiniLabel, { color: c.text }]}>{c.label}</Text>
+              <View style={[styles.wccMiniAccent, { backgroundColor: c.accent }]} />
+            </View>
+          ))}
+        </View>
+      )}
     </View>
   )
 }

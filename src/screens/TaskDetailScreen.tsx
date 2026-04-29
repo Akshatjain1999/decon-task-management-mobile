@@ -138,6 +138,8 @@ export default function TaskDetailScreen({ route, navigation }: Props) {
   const [reassigningSubtask, setReassigningSubtask] = useState<number | null>(null)
 
   const [newSubtask, setNewSubtask] = useState('')
+  const [newSubtaskDueDate, setNewSubtaskDueDate] = useState<string>('')
+  const [newSubtaskEstimate, setNewSubtaskEstimate] = useState<string>('')
   const [addingSubtask, setAddingSubtask] = useState(false)
   const [newSubtaskOwnerId, setNewSubtaskOwnerId] = useState<number | null>(null)
   const [showOwnerPicker, setShowOwnerPicker] = useState(false)
@@ -441,10 +443,22 @@ export default function TaskDetailScreen({ route, navigation }: Props) {
     if (!task || !newSubtask.trim()) return
     setAddingSubtask(true)
     try {
-      const subtask = await taskService.createSubtask(task.id, newSubtask.trim(), newSubtaskOwnerId)
+      const dueDate = newSubtaskDueDate.trim() || null
+      const estimate = newSubtaskEstimate.trim()
+        ? Math.max(0, parseInt(newSubtaskEstimate.trim(), 10) || 0)
+        : null
+      const subtask = await taskService.createSubtask(
+        task.id,
+        newSubtask.trim(),
+        newSubtaskOwnerId,
+        dueDate,
+        estimate,
+      )
       setTask((prev) => prev ? { ...prev, subtasks: [...prev.subtasks, subtask], subtasksTotal: prev.subtasksTotal + 1 } : prev)
       setNewSubtask('')
       setNewSubtaskOwnerId(null)
+      setNewSubtaskDueDate('')
+      setNewSubtaskEstimate('')
     } catch (e: any) {
       showToast(e?.message || 'Failed to add subtask')
     } finally {
@@ -985,6 +999,43 @@ export default function TaskDetailScreen({ route, navigation }: Props) {
                     </TouchableOpacity>
                   )}
                 </TouchableOpacity>
+
+                {/* Due date + estimate inputs */}
+                <View style={{ flexDirection: 'row', gap: 6 }}>
+                  <View style={[styles.miniInputBox, { flex: 1.2 }]}>
+                    <Text style={styles.miniInputIcon}>📅</Text>
+                    <TextInput
+                      style={styles.miniInput}
+                      value={newSubtaskDueDate}
+                      onChangeText={setNewSubtaskDueDate}
+                      placeholder="Due (YYYY-MM-DD)"
+                      placeholderTextColor="#aaa"
+                      autoCapitalize="none"
+                      autoCorrect={false}
+                    />
+                    {newSubtaskDueDate.length > 0 && (
+                      <TouchableOpacity onPress={() => setNewSubtaskDueDate('')}>
+                        <Text style={{ color: '#ba1a1a', fontSize: 12 }}>✕</Text>
+                      </TouchableOpacity>
+                    )}
+                  </View>
+                  <View style={[styles.miniInputBox, { flex: 1 }]}>
+                    <Text style={styles.miniInputIcon}>⏱️</Text>
+                    <TextInput
+                      style={styles.miniInput}
+                      value={newSubtaskEstimate}
+                      onChangeText={setNewSubtaskEstimate}
+                      placeholder="Est. mins"
+                      placeholderTextColor="#aaa"
+                      keyboardType="number-pad"
+                    />
+                    {newSubtaskEstimate.length > 0 && (
+                      <TouchableOpacity onPress={() => setNewSubtaskEstimate('')}>
+                        <Text style={{ color: '#ba1a1a', fontSize: 12 }}>✕</Text>
+                      </TouchableOpacity>
+                    )}
+                  </View>
+                </View>
               </View>
             </View>
           )}
@@ -1132,6 +1183,37 @@ function SubtaskRow({ subtask, settingStatus, reassigningOwner, notesCount, expa
                 </View>
               : <Text style={styles.subtaskOwnerEmpty}>+ assign owner</Text>}
         </TouchableOpacity>
+
+        {/* Meta chips: due date / estimate / completed */}
+        {(subtask.dueDate || subtask.estimatedMinutes || (subtask.completedAt && subtask.status === 'DONE')) && (
+          <View style={styles.subtaskMetaRow}>
+            {subtask.dueDate && (
+              <View style={[
+                styles.subtaskChip,
+                isSubtaskOverdue(subtask.dueDate) && subtask.status !== 'DONE'
+                  ? { backgroundColor: '#ffdad6' }
+                  : { backgroundColor: '#e0f2f1' },
+              ]}>
+                <Text style={[
+                  styles.subtaskChipText,
+                  isSubtaskOverdue(subtask.dueDate) && subtask.status !== 'DONE'
+                    ? { color: '#ba1a1a' }
+                    : { color: '#006a66' },
+                ]}>📅 {formatSubtaskDate(subtask.dueDate)}</Text>
+              </View>
+            )}
+            {subtask.estimatedMinutes != null && subtask.estimatedMinutes > 0 && (
+              <View style={[styles.subtaskChip, { backgroundColor: '#dbf4f3' }]}>
+                <Text style={[styles.subtaskChipText, { color: '#0d9488' }]}>⏱️ {formatSubtaskEstimate(subtask.estimatedMinutes)}</Text>
+              </View>
+            )}
+            {subtask.completedAt && subtask.status === 'DONE' && (
+              <View style={[styles.subtaskChip, { backgroundColor: '#dcfce7' }]}>
+                <Text style={[styles.subtaskChipText, { color: '#166534' }]}>✓ {formatSubtaskDate(subtask.completedAt)}</Text>
+              </View>
+            )}
+          </View>
+        )}
       </View>
 
       {/* Right: notes + delete */}
@@ -1146,6 +1228,31 @@ function SubtaskRow({ subtask, settingStatus, reassigningOwner, notesCount, expa
 
     </View>
   )
+}
+
+function isSubtaskOverdue(d: string): boolean {
+  try {
+    const dt = new Date(d.length <= 10 ? d + 'T23:59:59' : d)
+    return dt.getTime() < Date.now()
+  } catch { return false }
+}
+
+function formatSubtaskDate(d: string): string {
+  try {
+    const dt = new Date(d.length <= 10 ? d + 'T00:00:00' : d)
+    const opts: Intl.DateTimeFormatOptions = { month: 'short', day: 'numeric' }
+    if (dt.getFullYear() !== new Date().getFullYear()) opts.year = 'numeric'
+    return dt.toLocaleDateString('en', opts)
+  } catch { return d }
+}
+
+function formatSubtaskEstimate(mins: number): string {
+  if (mins <= 0) return ''
+  const h = Math.floor(mins / 60)
+  const m = mins % 60
+  if (h > 0 && m > 0) return `${h}h ${m}m`
+  if (h > 0) return `${h}h`
+  return `${m}m`
 }
 
 function CommentCard({ comment, isOwn, onDelete }: { comment: Comment; isOwn: boolean; onDelete: () => void }) {
@@ -1310,6 +1417,16 @@ const styles = StyleSheet.create({
     paddingHorizontal: 10, paddingVertical: 7,
   },
   ownerPickerText: { fontSize: 13, color: '#006a66', flex: 1 },
+  miniInputBox: {
+    flexDirection: 'row', alignItems: 'center', gap: 6,
+    backgroundColor: '#fff', borderRadius: 10, borderWidth: 1, borderColor: '#e0e3e5',
+    paddingHorizontal: 10, paddingVertical: 7,
+  },
+  miniInputIcon: { fontSize: 12 },
+  miniInput: { flex: 1, fontSize: 13, color: '#041627', padding: 0 },
+  subtaskMetaRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 4, marginTop: 4 },
+  subtaskChip: { paddingHorizontal: 6, paddingVertical: 2, borderRadius: 6 },
+  subtaskChipText: { fontSize: 10, fontWeight: '600' },
   statusDot: { width: 10, height: 10, borderRadius: 5, marginRight: 4 },
   ownerModal: {
     backgroundColor: '#fff', borderTopLeftRadius: 24, borderTopRightRadius: 24,
