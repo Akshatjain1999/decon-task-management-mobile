@@ -1,6 +1,7 @@
 import AsyncStorage from '@react-native-async-storage/async-storage'
 import api, { API_BASE_URL } from './api'
 import type { Task, CreateTaskRequest, UpdateTaskRequest, Comment, TaskAuditsResponse, Subtask, SubtaskNote } from '../types'
+import { compressIfImage } from '../lib/imageCompress'
 
 export const taskService = {
   async getAll(): Promise<Task[]> {
@@ -113,7 +114,8 @@ export const taskService = {
     const formData = new FormData()
     formData.append('note', note)
     if (attachment) {
-      formData.append('attachment', { uri: attachment.uri, name: attachment.name, type: attachment.type } as any)
+      const compressed = await compressIfImage(attachment)
+      formData.append('attachment', { uri: compressed.uri, name: compressed.name, type: compressed.type } as any)
     }
     const headers: Record<string, string> = {}
     if (token) headers['Authorization'] = `Bearer ${token}`
