@@ -274,9 +274,10 @@ export default function SubtaskDetailSheet({
 
   const mentionMatches = useMemo(() => {
     if (!mentionTrigger) return []
+    const list = users ?? []
     const q = mentionTrigger.query
-    if (!q) return users.slice(0, 6)
-    return users.filter((u) => u.name.toLowerCase().includes(q)).slice(0, 6)
+    if (!q) return list.slice(0, 6)
+    return list.filter((u) => u.name.toLowerCase().includes(q)).slice(0, 6)
   }, [mentionTrigger, users])
 
   const pickMention = (user: User) => {
@@ -310,7 +311,7 @@ export default function SubtaskDetailSheet({
     try {
       // Filter mention IDs to those still appearing in the final text (best-effort)
       const stillMentioned = pendingMentionIds.filter((id) => {
-        const u = users.find((x) => x.id === id)
+        const u = (users ?? []).find((x) => x.id === id)
         if (!u) return false
         const tag = '@' + u.name.replace(/\s+/g, '')
         return text.includes(tag)
@@ -355,8 +356,9 @@ export default function SubtaskDetailSheet({
     }
   }, [showToast])
 
-  const statusMeta = STATUS_META[subtask.status]
+  const statusMeta = STATUS_META[subtask.status] ?? STATUS_META.TODO
   const ownerLabel = subtask.ownerName || 'Unassigned'
+  const userList = users ?? []
 
   return (
     <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
@@ -686,7 +688,7 @@ export default function SubtaskDetailSheet({
                 <Text style={[styles.popItemText, !subtask.ownerId && { color: C.primary, fontWeight: '700' }]}>Unassigned</Text>
                 {!subtask.ownerId && <Text style={[styles.popCheck, { color: C.primary }]}>✓</Text>}
               </TouchableOpacity>
-              {users.map((u) => {
+              {userList.map((u) => {
                 const active = subtask.ownerId === u.id
                 return (
                   <TouchableOpacity key={u.id} style={[styles.popItem, active && styles.popItemActive]} onPress={() => setOwner(u.id)}>
