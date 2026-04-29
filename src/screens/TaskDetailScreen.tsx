@@ -445,7 +445,10 @@ export default function TaskDetailScreen({ route, navigation }: Props) {
     try {
       const dueDate = newSubtaskDueDate.trim() || null
       const estimate = newSubtaskEstimate.trim()
-        ? Math.max(0, parseInt(newSubtaskEstimate.trim(), 10) || 0)
+        ? (() => {
+            const num = parseFloat(newSubtaskEstimate.trim())
+            return isNaN(num) || num < 0 ? null : Math.round(num * 60)
+          })()
         : null
       const subtask = await taskService.createSubtask(
         task.id,
@@ -1025,9 +1028,9 @@ export default function TaskDetailScreen({ route, navigation }: Props) {
                       style={styles.miniInput}
                       value={newSubtaskEstimate}
                       onChangeText={setNewSubtaskEstimate}
-                      placeholder="Est. mins"
+                      placeholder="Est. hrs"
                       placeholderTextColor="#aaa"
-                      keyboardType="number-pad"
+                      keyboardType="decimal-pad"
                     />
                     {newSubtaskEstimate.length > 0 && (
                       <TouchableOpacity onPress={() => setNewSubtaskEstimate('')}>
@@ -1248,11 +1251,9 @@ function formatSubtaskDate(d: string): string {
 
 function formatSubtaskEstimate(mins: number): string {
   if (mins <= 0) return ''
-  const h = Math.floor(mins / 60)
-  const m = mins % 60
-  if (h > 0 && m > 0) return `${h}h ${m}m`
-  if (h > 0) return `${h}h`
-  return `${m}m`
+  const hours = mins / 60
+  const txt = Number(hours.toFixed(2)).toString()
+  return `${txt}h`
 }
 
 function CommentCard({ comment, isOwn, onDelete }: { comment: Comment; isOwn: boolean; onDelete: () => void }) {
