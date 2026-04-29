@@ -35,6 +35,7 @@ export type SubtaskStatus = 'TODO' | 'IN_PROGRESS' | 'DONE'
 export interface Subtask {
   id: number
   title: string
+  description?: string | null
   status: SubtaskStatus
   isComplete: boolean
   sortOrder: number
@@ -152,7 +153,7 @@ export interface TaskAuditsResponse {
 }
 
 // ─── Notification ──────────────────────────────────────────────────────────
-export type NotificationType = 'TASK_ASSIGNED' | 'TASK_UPDATED' | 'REMINDER' | 'OVERDUE_ALERT'
+export type NotificationType = 'TASK_ASSIGNED' | 'TASK_UPDATED' | 'REMINDER' | 'OVERDUE_ALERT' | 'MENTION'
 
 export interface Notification {
   id: number

@@ -23,12 +23,14 @@ const TYPE_META: Record<NotificationType, {
   TASK_UPDATED:  { label: 'Task Updated',   icon: '✏️', accent: '#006a66', accentLight: '#e6f4f3' },
   REMINDER:      { label: 'Reminders',      icon: '🔔', accent: '#7c3aed', accentLight: '#ede9fe' },
   OVERDUE_ALERT: { label: 'Overdue Alerts', icon: '⚠️', accent: '#ba1a1a', accentLight: '#ffdad6' },
+  MENTION:       { label: 'Mentions',       icon: '💬', accent: '#006a66', accentLight: '#e6f7f6' },
 }
 
-const TYPE_ORDER: NotificationType[] = ['OVERDUE_ALERT', 'REMINDER', 'TASK_ASSIGNED', 'TASK_UPDATED']
+const TYPE_ORDER: NotificationType[] = ['MENTION', 'OVERDUE_ALERT', 'REMINDER', 'TASK_ASSIGNED', 'TASK_UPDATED']
 
 const FILTER_TABS: { key: FilterKey; label: string; icon: string }[] = [
   { key: 'ALL',           label: 'All',       icon: '🔔' },
+  { key: 'MENTION',       label: 'Mentions',  icon: '💬' },
   { key: 'OVERDUE_ALERT', label: 'Overdue',   icon: '⚠️' },
   { key: 'REMINDER',      label: 'Reminders', icon: '⏰' },
   { key: 'TASK_ASSIGNED', label: 'Assigned',  icon: '👤' },

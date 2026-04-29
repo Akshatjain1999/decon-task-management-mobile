@@ -46,9 +46,12 @@ function Root() {
   // Handle notification taps (when user taps the OS notification banner)
   useEffect(() => {
     // Returns undefined in Expo Go — safe to call regardless
-    const subscription = addNotificationTapListener((taskId: string) => {
+    const subscription = addNotificationTapListener((taskId: string, subtaskId?: string) => {
       if (navigationRef.current) {
-        navigationRef.current.navigate('TaskDetail', { taskId })
+        navigationRef.current.navigate('TaskDetail', {
+          taskId: Number(taskId),
+          openSubtaskId: subtaskId ? Number(subtaskId) : undefined,
+        })
       }
     })
     return () => subscription?.remove()

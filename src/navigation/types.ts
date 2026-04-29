@@ -4,7 +4,7 @@ export type RootStackParamList = {
   // Main tabs
   Main: undefined
   // Stack screens
-  TaskDetail: { taskId: number }
+  TaskDetail: { taskId: number; openSubtaskId?: number }
   CreateTask: undefined
   TaskTypeDashboard: { typeKey: string }
   WorkflowDetail: { typeKey: string; filter: string }

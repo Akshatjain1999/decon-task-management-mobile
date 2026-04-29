@@ -1,4 +1,4 @@
-import React, { useEffect, useCallback, useState } from 'react'
+import React, { useEffect, useCallback, useState, useMemo } from 'react'
 import {
   View,
   Text,
@@ -7,6 +7,7 @@ import {
   RefreshControl,
   TouchableOpacity,
   ActivityIndicator,
+  TextInput,
 } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { useNavigation } from '@react-navigation/native'
@@ -67,22 +68,54 @@ export default function TaskListScreen() {
   const navigation = useNavigation<Nav>()
   const { tasks, loading } = useAppSelector((s) => s.tasks)
   const [filter, setFilter] = useState<TaskStatus | 'ALL'>('ALL')
+  const [search, setSearch] = useState('')
 
   const load = useCallback(() => { dispatch(fetchTasks()) }, [dispatch])
   useEffect(() => { load() }, [load])
 
-  const filtered = filter === 'ALL' ? tasks : tasks.filter((t) => t.status === filter)
+  const filtered = useMemo(() => {
+    const byStatus = filter === 'ALL' ? tasks : tasks.filter((t) => t.status === filter)
+    const q = search.trim().toLowerCase()
+    if (!q) return byStatus
+    return byStatus.filter((t) => {
+      if (t.title.toLowerCase().includes(q)) return true
+      if (t.description?.toLowerCase().includes(q)) return true
+      if (t.assignedTo?.name.toLowerCase().includes(q)) return true
+      if (t.tags?.some((tag) => tag.name.toLowerCase().includes(q))) return true
+      return false
+    })
+  }, [tasks, filter, search])
 
   if (loading && tasks.length === 0) {
     return (
       <View style={styles.center}>
-        <ActivityIndicator size="large" color="#1a237e" />
+        <ActivityIndicator size="large" color="#006a66" />
       </View>
     )
   }
 
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
+      {/* Search bar */}
+      <View style={styles.searchWrap}>
+        <Text style={styles.searchIcon}>🔍</Text>
+        <TextInput
+          style={styles.searchInput}
+          value={search}
+          onChangeText={setSearch}
+          placeholder="Search tasks, people, tags…"
+          placeholderTextColor="#9aa0a6"
+          autoCapitalize="none"
+          autoCorrect={false}
+          returnKeyType="search"
+        />
+        {search.length > 0 && (
+          <TouchableOpacity onPress={() => setSearch('')} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+            <Text style={styles.searchClear}>✕</Text>
+          </TouchableOpacity>
+        )}
+      </View>
+
       {/* Filter tabs */}
       <FlatList
         horizontal
@@ -110,7 +143,7 @@ export default function TaskListScreen() {
         data={filtered}
         keyExtractor={(t) => String(t.id)}
         renderItem={({ item }) => <TaskCard task={item} />}
-        refreshControl={<RefreshControl refreshing={loading} onRefresh={load} />}
+        refreshControl={<RefreshControl refreshing={loading} onRefresh={load} tintColor="#006a66" colors={['#006a66']} />}
         ListEmptyComponent={<Text style={styles.empty}>No tasks found.</Text>}
       />
 
@@ -123,10 +156,21 @@ export default function TaskListScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#f0f4ff' },
+  container: { flex: 1, backgroundColor: '#f5f7f8' },
   list: { flex: 1 },
   content: { padding: 16, gap: 12, paddingBottom: 80 },
   center: { flex: 1, justifyContent: 'center', alignItems: 'center' },
+
+  searchWrap: {
+    flexDirection: 'row', alignItems: 'center', gap: 8,
+    marginHorizontal: 12, marginTop: 8, paddingHorizontal: 12,
+    backgroundColor: '#fff', borderRadius: 12, height: 42,
+    borderWidth: 1, borderColor: '#e0e3e5',
+  },
+  searchIcon: { fontSize: 14, color: '#9aa0a6' },
+  searchInput: { flex: 1, fontSize: 14, color: '#191c1e', paddingVertical: 0 },
+  searchClear: { fontSize: 14, color: '#9aa0a6', paddingHorizontal: 4 },
+
   filterList: { flexGrow: 0 },
   filterRow: { paddingHorizontal: 12, paddingVertical: 10, gap: 8, alignItems: 'center' },
   filterTab: {
@@ -135,12 +179,12 @@ const styles = StyleSheet.create({
     borderRadius: 20,
     backgroundColor: '#fff',
     borderWidth: 1.5,
-    borderColor: '#c5cae9',
+    borderColor: '#e0e3e5',
     height: 34,
     justifyContent: 'center',
   },
-  filterTabActive: { backgroundColor: '#1a237e', borderColor: '#1a237e' },
-  filterTabText: { fontSize: 12, fontWeight: '600', color: '#555' },
+  filterTabActive: { backgroundColor: '#006a66', borderColor: '#006a66' },
+  filterTabText: { fontSize: 12, fontWeight: '600', color: '#737c7f' },
   filterTabTextActive: { color: '#fff' },
   card: {
     backgroundColor: '#fff',
@@ -158,14 +202,14 @@ const styles = StyleSheet.create({
     gap: 8,
     marginBottom: 8,
   },
-  taskTitle: { flex: 1, fontSize: 15, fontWeight: '600', color: '#111' },
+  taskTitle: { flex: 1, fontSize: 15, fontWeight: '600', color: '#191c1e' },
   badge: { borderRadius: 6, paddingHorizontal: 8, paddingVertical: 3 },
   badgeText: { fontSize: 11, fontWeight: '600' },
   cardMeta: { flexDirection: 'row', alignItems: 'center', gap: 6 },
   priorityDot: { width: 8, height: 8, borderRadius: 4 },
-  metaText: { fontSize: 12, color: '#666' },
-  assignee: { fontSize: 12, color: '#555', marginTop: 6 },
-  empty: { textAlign: 'center', color: '#999', marginTop: 60 },
+  metaText: { fontSize: 12, color: '#737c7f' },
+  assignee: { fontSize: 12, color: '#44474c', marginTop: 6 },
+  empty: { textAlign: 'center', color: '#9aa0a6', marginTop: 60 },
   fab: {
     position: 'absolute',
     bottom: 20,
@@ -173,7 +217,7 @@ const styles = StyleSheet.create({
     width: 56,
     height: 56,
     borderRadius: 28,
-    backgroundColor: '#1a237e',
+    backgroundColor: '#006a66',
     justifyContent: 'center',
     alignItems: 'center',
     elevation: 6,

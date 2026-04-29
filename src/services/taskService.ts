@@ -55,11 +55,13 @@ export const taskService = {
     ownerId?: number | null,
     dueDate?: string | null,
     estimatedMinutes?: number | null,
+    description?: string | null,
   ): Promise<Subtask> {
     const body: Record<string, unknown> = { title }
     if (ownerId) body.ownerId = ownerId
     if (dueDate) body.dueDate = dueDate
     if (estimatedMinutes != null) body.estimatedMinutes = estimatedMinutes
+    if (description != null) body.description = description
     const res = await api.post<Subtask>(`/api/v1/tasks/${taskId}/subtasks`, body)
     return res.data
   },
@@ -83,13 +85,17 @@ export const taskService = {
     ownerId?: number | null,
     dueDate?: string | null,
     estimatedMinutes?: number | null,
+    description?: string | null,
   ): Promise<Subtask> {
-    const res = await api.put<Subtask>(`/api/v1/tasks/${taskId}/subtasks/${subtaskId}`, {
+    // description === undefined => omit (preserve); null => explicit clear
+    const body: Record<string, unknown> = {
       title,
       ownerId: ownerId ?? null,
       dueDate: dueDate || null,
       estimatedMinutes: estimatedMinutes ?? null,
-    })
+    }
+    if (description !== undefined) body.description = description
+    const res = await api.put<Subtask>(`/api/v1/tasks/${taskId}/subtasks/${subtaskId}`, body)
     return res.data
   },
 
@@ -107,6 +113,7 @@ export const taskService = {
     subtaskId: number,
     note: string,
     attachment?: { uri: string; name: string; type: string } | null,
+    mentionUserIds?: number[],
   ): Promise<SubtaskNote> {
     // Use native fetch instead of Axios — Axios's transformers break FormData in React Native.
     // fetch() lets the native XHR layer set Content-Type: multipart/form-data; boundary=... automatically.
@@ -116,6 +123,14 @@ export const taskService = {
     if (attachment) {
       const compressed = await compressIfImage(attachment)
       formData.append('attachment', { uri: compressed.uri, name: compressed.name, type: compressed.type } as any)
+    }
+    if (mentionUserIds && mentionUserIds.length > 0) {
+      const seen = new Set<number>()
+      for (const id of mentionUserIds) {
+        if (seen.has(id)) continue
+        seen.add(id)
+        formData.append('mentionUserIds', String(id))
+      }
     }
     const headers: Record<string, string> = {}
     if (token) headers['Authorization'] = `Bearer ${token}`

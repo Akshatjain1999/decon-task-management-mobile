@@ -27,6 +27,7 @@ import { userService } from '../services/userService'
 import { useAppDispatch, useAppSelector } from '../store/hooks'
 import { updateTask, fetchTasks } from '../store/taskSlice'
 import type { Task, TaskStatus, Comment, TaskAuditsResponse, Subtask, SubtaskNote, SubtaskStatus, User } from '../types'
+import SubtaskDetailSheet from '../components/SubtaskDetailSheet'
 
 type Props = NativeStackScreenProps<RootStackParamList, 'TaskDetail'>
 type Tab = 'details' | 'subtasks' | 'comments' | 'activity'
@@ -114,7 +115,7 @@ function useToast() {
 
 // ─── Main Screen ─────────────────────────────────────────────────────────────
 export default function TaskDetailScreen({ route, navigation }: Props) {
-  const { taskId } = route.params
+  const { taskId, openSubtaskId } = route.params
   const dispatch = useAppDispatch()
   const currentUser = useAppSelector((s) => s.auth.user)
 
@@ -148,6 +149,7 @@ export default function TaskDetailScreen({ route, navigation }: Props) {
   const [togglingSubtaskId, setTogglingSubtaskId] = useState<number | null>(null)
   const [settingStatusId, setSettingStatusId] = useState<number | null>(null)
   const [expandedSubtaskId, setExpandedSubtaskId] = useState<number | null>(null)
+  const [selectedSubtaskId, setSelectedSubtaskId] = useState<number | null>(null)
   const [subtaskNotes, setSubtaskNotes] = useState<Record<number, SubtaskNote[]>>({})
   const [notesLoading, setNotesLoading] = useState<Record<number, boolean>>({})
   const [noteText, setNoteText] = useState<Record<number, string>>({})
@@ -217,6 +219,16 @@ export default function TaskDetailScreen({ route, navigation }: Props) {
   }, [taskId])
 
   useEffect(() => { loadTask() }, [loadTask])
+
+  // Auto-open subtask sheet if deep-linked
+  useEffect(() => {
+    if (!task || !openSubtaskId) return
+    const exists = task.subtasks.some((s) => s.id === openSubtaskId)
+    if (exists) {
+      setActiveTab('subtasks')
+      setSelectedSubtaskId(openSubtaskId)
+    }
+  }, [task, openSubtaskId])
 
   useEffect(() => {
     userService.getAll().then(setUsers).catch(() => {})
@@ -372,20 +384,15 @@ export default function TaskDetailScreen({ route, navigation }: Props) {
   }
 
   const handleToggleNotes = async (subtaskId: number) => {
-    if (expandedSubtaskId === subtaskId) {
-      setExpandedSubtaskId(null)
-      return
-    }
-    setExpandedSubtaskId(subtaskId)
+    // Open dedicated detail sheet instead of inline notes panel
+    setSelectedSubtaskId(subtaskId)
     if (subtaskNotes[subtaskId]) return
-    setNotesLoading((prev) => ({ ...prev, [subtaskId]: true }))
+    // Pre-load count badge in row (best-effort, non-blocking)
     try {
       const notes = await taskService.getSubtaskNotes(subtaskId)
       setSubtaskNotes((prev) => ({ ...prev, [subtaskId]: notes }))
-    } catch (e: any) {
-      showToast(e?.message || 'Failed to load notes')
-    } finally {
-      setNotesLoading((prev) => ({ ...prev, [subtaskId]: false }))
+    } catch {
+      // ignore
     }
   }
 
@@ -725,6 +732,33 @@ export default function TaskDetailScreen({ route, navigation }: Props) {
         </View>
       </Modal>
 
+      {/* ── Subtask detail bottom-sheet ──────────────────────────── */}
+      <SubtaskDetailSheet
+        visible={selectedSubtaskId !== null}
+        taskId={taskId}
+        subtask={task.subtasks.find((s) => s.id === selectedSubtaskId) ?? null}
+        users={users}
+        currentUserId={currentUser?.userId}
+        isAdmin={(currentUser?.role ?? '').toUpperCase().includes('ADMIN')}
+        canDelete={(currentUser?.role ?? '').toUpperCase().includes('ADMIN')}
+        onClose={() => setSelectedSubtaskId(null)}
+        onUpdated={(updated) => {
+          setTask((prev) => prev ? {
+            ...prev,
+            subtasks: prev.subtasks.map((s) => s.id === updated.id ? { ...s, ...updated } : s),
+            subtasksCompleted: prev.subtasks.map((s) => s.id === updated.id ? updated : s).filter((s) => s.isComplete).length,
+          } : prev)
+        }}
+        onDeleted={(id) => {
+          setTask((prev) => prev ? {
+            ...prev,
+            subtasks: prev.subtasks.filter((s) => s.id !== id),
+            subtasksTotal: prev.subtasksTotal - 1,
+          } : prev)
+        }}
+        showToast={showToast}
+      />
+
       <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
         {/* ── Hero Header ── */}
         <View style={styles.heroCard}>
@@ -883,88 +917,18 @@ export default function TaskDetailScreen({ route, navigation }: Props) {
 
               {/* Subtask list */}
               {task.subtasks.map((sub) => (
-                <View key={sub.id}>
-                  <SubtaskRow
-                    subtask={sub}
-                    settingStatus={settingStatusId === sub.id}
-                    reassigningOwner={reassigningSubtask === sub.id}
-                    notesCount={subtaskNotes[sub.id]?.length ?? 0}
-                    expanded={expandedSubtaskId === sub.id}
-                    onSetStatus={() => handleSetSubtaskStatus(sub.id, sub.status)}
-                    onToggleNotes={() => handleToggleNotes(sub.id)}
-                    onDelete={() => handleDeleteSubtask(sub.id)}
-                    onReassignOwner={() => setSubtaskOwnerPicker({ subtaskId: sub.id, title: sub.title, currentOwnerId: sub.ownerId ?? undefined })}
-                  />
-                  {expandedSubtaskId === sub.id && (
-                    <View style={styles.notesPanel}>
-                      {notesLoading[sub.id] && (
-                        <ActivityIndicator size="small" color="#1a237e" style={{ marginVertical: 8 }} />
-                      )}
-                      {(subtaskNotes[sub.id] || []).map((n) => (
-                        <View key={n.id} style={styles.noteRow}>
-                          <View style={styles.noteAvatar}>
-                            <Text style={styles.noteAvatarText}>{n.createdBy?.name?.charAt(0)?.toUpperCase() ?? '?'}</Text>
-                          </View>
-                          <View style={{ flex: 1 }}>
-                            <Text style={styles.noteAuthor}>{n.createdBy?.name}</Text>
-                            <Text style={styles.noteText}>{n.note}</Text>
-                            {n.hasAttachment && n.attachmentName && (
-                              <TouchableOpacity
-                                style={styles.attachmentChip}
-                                onPress={() => handleOpenAttachment(n.id, n.attachmentName!, n.attachmentType)}
-                              >
-                                <Text style={styles.attachmentChipText}>📎 {n.attachmentName}</Text>
-                              </TouchableOpacity>
-                            )}
-                            <Text style={styles.noteMeta}>{timeAgo(n.createdAt)}</Text>
-                          </View>
-                          {n.createdBy?.id === currentUser?.userId && (
-                            <TouchableOpacity onPress={() => handleDeleteSubtaskNote(sub.id, n.id)}>
-                              <Text style={{ color: '#ba1a1a', fontSize: 12 }}>Delete</Text>
-                            </TouchableOpacity>
-                          )}
-                        </View>
-                      ))}
-                      {!notesLoading[sub.id] && (subtaskNotes[sub.id] || []).length === 0 && (
-                        <Text style={styles.noteEmpty}>No notes yet.</Text>
-                      )}
-                      {/* Attachment preview */}
-                      {noteAttachment[sub.id] && (
-                        <View style={styles.attachmentPreview}>
-                          <Text style={styles.attachmentPreviewText} numberOfLines={1}>📎 {noteAttachment[sub.id]!.name}</Text>
-                          <TouchableOpacity onPress={() => setNoteAttachment((prev) => ({ ...prev, [sub.id]: null }))}>
-                            <Text style={{ color: '#ba1a1a', fontSize: 12 }}>✕</Text>
-                          </TouchableOpacity>
-                        </View>
-                      )}
-                      <View style={styles.addRow}>
-                        <TextInput
-                          style={styles.addInput}
-                          value={noteText[sub.id] ?? ''}
-                          onChangeText={(t) => setNoteText((prev) => ({ ...prev, [sub.id]: t }))}
-                          placeholder="Add a note…"
-                          placeholderTextColor="#aaa"
-                          multiline
-                        />
-                        <TouchableOpacity
-                          style={[styles.addBtn, { backgroundColor: '#546e7a', minWidth: 44 }]}
-                          onPress={() => handlePickAttachment(sub.id)}
-                        >
-                          <Text style={styles.addBtnText}>📎</Text>
-                        </TouchableOpacity>
-                        <TouchableOpacity
-                          style={styles.addBtn}
-                          onPress={() => handleAddSubtaskNote(sub.id)}
-                          disabled={submittingNote === sub.id || !noteText[sub.id]?.trim()}
-                        >
-                          {submittingNote === sub.id
-                            ? <ActivityIndicator size="small" color="#fff" />
-                            : <Text style={styles.addBtnText}>Add</Text>}
-                        </TouchableOpacity>
-                      </View>
-                    </View>
-                  )}
-                </View>
+                <SubtaskRow
+                  key={sub.id}
+                  subtask={sub}
+                  settingStatus={settingStatusId === sub.id}
+                  reassigningOwner={reassigningSubtask === sub.id}
+                  notesCount={subtaskNotes[sub.id]?.length ?? 0}
+                  expanded={false}
+                  onSetStatus={() => handleSetSubtaskStatus(sub.id, sub.status)}
+                  onToggleNotes={() => handleToggleNotes(sub.id)}
+                  onDelete={() => handleDeleteSubtask(sub.id)}
+                  onReassignOwner={() => setSubtaskOwnerPicker({ subtaskId: sub.id, title: sub.title, currentOwnerId: sub.ownerId ?? undefined })}
+                />
               ))}
               {task.subtasks.length === 0 && (
                 <Text style={styles.empty}>No subtasks yet.</Text>
@@ -1222,7 +1186,7 @@ function SubtaskRow({ subtask, settingStatus, reassigningOwner, notesCount, expa
       {/* Right: notes + delete */}
       <View style={styles.subtaskRight}>
         <TouchableOpacity onPress={onToggleNotes} style={styles.subtaskNotesBtn}>
-          <Text style={styles.subtaskNotesBtnText}>{expanded ? '▲' : '🗒️'}{notesCount > 0 ? ` ${notesCount}` : ''}</Text>
+          <Text style={styles.subtaskNotesBtnText}>Open ›{notesCount > 0 ? `  💬 ${notesCount}` : ''}</Text>
         </TouchableOpacity>
         <TouchableOpacity onPress={onDelete} style={styles.subtaskDelBtn}>
           <Text style={styles.subtaskDelText}>✕</Text>

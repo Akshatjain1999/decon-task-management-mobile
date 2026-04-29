@@ -29,11 +29,11 @@ export function setupNotificationHandler(): void {
 }
 
 /**
- * Listens for notification taps and calls onTap(taskId) when the payload has a taskId.
+ * Listens for notification taps and calls onTap(taskId, subtaskId?) when the payload has a taskId.
  * Returns undefined in Expo Go.
  */
 export function addNotificationTapListener(
-  onTap: (taskId: string) => void,
+  onTap: (taskId: string, subtaskId?: string) => void,
 ): { remove: () => void } | undefined {
   if (isExpoGo()) return undefined
   // eslint-disable-next-line @typescript-eslint/no-var-requires
@@ -41,7 +41,7 @@ export function addNotificationTapListener(
   const subscription = Notifications.addNotificationResponseReceivedListener(
     (response: any) => {
       const data = response?.notification?.request?.content?.data as Record<string, any>
-      if (data?.taskId) onTap(String(data.taskId))
+      if (data?.taskId) onTap(String(data.taskId), data.subtaskId ? String(data.subtaskId) : undefined)
     },
   )
   return subscription
