@@ -190,11 +190,10 @@ function WccBillingCard({ typeKey, breakdown }: { typeKey: string; breakdown: Ta
   ]
 
   const highlightCards: { label: string; value: number; text: string; accent: string }[] = []
-  if (wb.liveCompleted != null) {
-    highlightCards.push({ label: 'Live', value: wb.liveCompleted, text: '#0e7490', accent: '#67e8f9' })
-  }
-  if (wb.pendingMaterialCompleted != null) {
-    highlightCards.push({ label: 'Pending Material Done', value: wb.pendingMaterialCompleted, text: '#92400e', accent: '#fcd34d' })
+  highlightCards.push({ label: 'L1', value: wb.l1Completed ?? 0, text: '#0e7490', accent: '#67e8f9' })
+  highlightCards.push({ label: 'L2', value: wb.l2Completed ?? 0, text: '#15803d', accent: '#4ade80' })
+  if (wb.l3Completed != null) {
+    highlightCards.push({ label: 'L3', value: wb.l3Completed, text: '#92400e', accent: '#fcd34d' })
   }
 
   return (

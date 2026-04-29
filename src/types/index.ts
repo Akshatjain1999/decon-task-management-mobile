@@ -203,8 +203,12 @@ export interface WccBillingStats {
   wccCompleted: number
   billingPending: number
   billingCompleted: number
-  liveCompleted?: number
-  pendingMaterialCompleted?: number
+  /** L1: every subtask up to & including the L1 anchor ("WCC" for CCTV; "Live after installation done" for Lift/Racks) is DONE. */
+  l1Completed: number
+  /** L2: every subtask up to & including "Billing completed" is DONE. */
+  l2Completed: number
+  /** L3: every subtask up to & including "Delivered pending material" is DONE. Null for Lift/Racks. */
+  l3Completed: number | null
 }
 
 export interface TaskTypeBreakdown {

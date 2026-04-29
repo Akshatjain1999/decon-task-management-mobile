@@ -28,8 +28,12 @@ const FILTER_META: Record<string, { label: string; bg: string; text: string; acc
   WCC_COMPLETED:              { label: 'WCC Completed',     bg: '#dcfce7', text: '#166534', accent: '#86efac', description: 'WCC has been completed on these tasks.' },
   BILLING_PENDING:            { label: 'Billing Pending',   bg: '#fef2f2', text: '#ba1a1a', accent: '#fca5a5', description: 'WCC done — waiting for billing to be completed.' },
   BILLING_COMPLETED:          { label: 'Billing Completed', bg: '#f0fdf4', text: '#15803d', accent: '#4ade80', description: 'Billing has been completed on these tasks.' },
-  LIVE_COMPLETED:             { label: 'Live',              bg: '#ecfeff', text: '#0e7490', accent: '#67e8f9', description: 'Tasks that have gone live.' },
-  PENDING_MATERIAL_COMPLETED: { label: 'Pending Material Done', bg: '#fffbeb', text: '#92400e', accent: '#fcd34d', description: 'Pending material has been delivered for these tasks.' },
+  L1_COMPLETED:               { label: 'L1', bg: '#ecfeff', text: '#0e7490', accent: '#67e8f9', description: 'Every subtask up to & including the L1 milestone (WCC for CCTV; Live for Lift/Racks) is done.' },
+  L2_COMPLETED:               { label: 'L2', bg: '#f0fdf4', text: '#15803d', accent: '#4ade80', description: 'Every subtask up to & including Billing completed is done.' },
+  L3_COMPLETED:               { label: 'L3', bg: '#fffbeb', text: '#92400e', accent: '#fcd34d', description: 'Every subtask up to & including Delivered pending material is done.' },
+  // Legacy aliases
+  LIVE_COMPLETED:             { label: 'L1', bg: '#ecfeff', text: '#0e7490', accent: '#67e8f9', description: 'Every subtask up to & including the L1 milestone is done.' },
+  PENDING_MATERIAL_COMPLETED: { label: 'L3', bg: '#fffbeb', text: '#92400e', accent: '#fcd34d', description: 'Every subtask up to & including Delivered pending material is done.' },
 }
 
 const STATUS_COLORS: Record<string, { bg: string; text: string }> = {

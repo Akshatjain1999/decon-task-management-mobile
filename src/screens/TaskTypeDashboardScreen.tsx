@@ -423,31 +423,39 @@ export default function TaskTypeDashboardScreen() {
               ))}
             </View>
 
-            {/* Completion highlights — Live / Pending Material (when available) */}
-            {(data.wccBillingStats.liveCompleted != null || data.wccBillingStats.pendingMaterialCompleted != null) && (
+            {/* Completion highlights — L1 / L2 / L3 (strict: every subtask up to anchor is DONE) */}
+            {(data.wccBillingStats.l1Completed != null || data.wccBillingStats.l2Completed != null || data.wccBillingStats.l3Completed != null) && (
               <>
                 <Text style={styles.sectionTitle}>COMPLETION HIGHLIGHTS</Text>
                 <View style={styles.wccGrid}>
-                  {data.wccBillingStats.liveCompleted != null && (
+                  <TouchableOpacity
+                    onPress={() => navigation.navigate('WorkflowDetail', { typeKey, filter: 'L1_COMPLETED' })}
+                    activeOpacity={0.75}
+                    style={styles.wccCard}
+                  >
+                    <Text style={styles.wccValue}>{data.wccBillingStats.l1Completed ?? 0}</Text>
+                    <Text style={[styles.wccLabel, { color: '#0e7490' }]}>L1</Text>
+                    <View style={[styles.wccAccent, { backgroundColor: '#67e8f9' }]} />
+                    <Text style={[styles.wccArrow, { color: '#0e7490' }]}>›</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    onPress={() => navigation.navigate('WorkflowDetail', { typeKey, filter: 'L2_COMPLETED' })}
+                    activeOpacity={0.75}
+                    style={styles.wccCard}
+                  >
+                    <Text style={styles.wccValue}>{data.wccBillingStats.l2Completed ?? 0}</Text>
+                    <Text style={[styles.wccLabel, { color: '#15803d' }]}>L2</Text>
+                    <View style={[styles.wccAccent, { backgroundColor: '#4ade80' }]} />
+                    <Text style={[styles.wccArrow, { color: '#15803d' }]}>›</Text>
+                  </TouchableOpacity>
+                  {data.wccBillingStats.l3Completed != null && (
                     <TouchableOpacity
-                      onPress={() => navigation.navigate('WorkflowDetail', { typeKey, filter: 'LIVE_COMPLETED' })}
+                      onPress={() => navigation.navigate('WorkflowDetail', { typeKey, filter: 'L3_COMPLETED' })}
                       activeOpacity={0.75}
                       style={styles.wccCard}
                     >
-                      <Text style={styles.wccValue}>{data.wccBillingStats.liveCompleted}</Text>
-                      <Text style={[styles.wccLabel, { color: '#0e7490' }]}>{typeKey === 'CCTV_INSTALLATION' ? 'Live' : 'Live'}</Text>
-                      <View style={[styles.wccAccent, { backgroundColor: '#67e8f9' }]} />
-                      <Text style={[styles.wccArrow, { color: '#0e7490' }]}>›</Text>
-                    </TouchableOpacity>
-                  )}
-                  {data.wccBillingStats.pendingMaterialCompleted != null && (
-                    <TouchableOpacity
-                      onPress={() => navigation.navigate('WorkflowDetail', { typeKey, filter: 'PENDING_MATERIAL_COMPLETED' })}
-                      activeOpacity={0.75}
-                      style={styles.wccCard}
-                    >
-                      <Text style={styles.wccValue}>{data.wccBillingStats.pendingMaterialCompleted}</Text>
-                      <Text style={[styles.wccLabel, { color: '#92400e' }]}>Pending Material Done</Text>
+                      <Text style={styles.wccValue}>{data.wccBillingStats.l3Completed}</Text>
+                      <Text style={[styles.wccLabel, { color: '#92400e' }]}>L3</Text>
                       <View style={[styles.wccAccent, { backgroundColor: '#fcd34d' }]} />
                       <Text style={[styles.wccArrow, { color: '#92400e' }]}>›</Text>
                     </TouchableOpacity>
