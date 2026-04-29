@@ -28,6 +28,7 @@ import { useAppDispatch, useAppSelector } from '../store/hooks'
 import { updateTask, fetchTasks } from '../store/taskSlice'
 import type { Task, TaskStatus, Comment, TaskAuditsResponse, Subtask, SubtaskNote, SubtaskStatus, User } from '../types'
 import SubtaskDetailSheet from '../components/SubtaskDetailSheet'
+import DateTimePicker, { type DateTimePickerEvent } from '@react-native-community/datetimepicker'
 
 type Props = NativeStackScreenProps<RootStackParamList, 'TaskDetail'>
 type Tab = 'details' | 'subtasks' | 'comments' | 'activity'
@@ -140,6 +141,7 @@ export default function TaskDetailScreen({ route, navigation }: Props) {
 
   const [newSubtask, setNewSubtask] = useState('')
   const [newSubtaskDueDate, setNewSubtaskDueDate] = useState<string>('')
+  const [showNewSubtaskDatePicker, setShowNewSubtaskDatePicker] = useState(false)
   const [newSubtaskEstimate, setNewSubtaskEstimate] = useState<string>('')
   const [addingSubtask, setAddingSubtask] = useState(false)
   const [newSubtaskOwnerId, setNewSubtaskOwnerId] = useState<number | null>(null)
@@ -977,23 +979,21 @@ export default function TaskDetailScreen({ route, navigation }: Props) {
 
                 {/* Due date + estimate inputs */}
                 <View style={{ flexDirection: 'row', gap: 6 }}>
-                  <View style={[styles.miniInputBox, { flex: 1.2 }]}>
+                  <TouchableOpacity
+                    style={[styles.miniInputBox, { flex: 1.2 }]}
+                    onPress={() => setShowNewSubtaskDatePicker(true)}
+                    activeOpacity={0.7}
+                  >
                     <Text style={styles.miniInputIcon}>📅</Text>
-                    <TextInput
-                      style={styles.miniInput}
-                      value={newSubtaskDueDate}
-                      onChangeText={setNewSubtaskDueDate}
-                      placeholder="Due (YYYY-MM-DD)"
-                      placeholderTextColor="#aaa"
-                      autoCapitalize="none"
-                      autoCorrect={false}
-                    />
+                    <Text style={[styles.miniInput, { color: newSubtaskDueDate ? '#191c1e' : '#aaa' }]}>
+                      {newSubtaskDueDate || 'Due date'}
+                    </Text>
                     {newSubtaskDueDate.length > 0 && (
-                      <TouchableOpacity onPress={() => setNewSubtaskDueDate('')}>
+                      <TouchableOpacity onPress={(e) => { e.stopPropagation?.(); setNewSubtaskDueDate('') }}>
                         <Text style={{ color: '#ba1a1a', fontSize: 12 }}>✕</Text>
                       </TouchableOpacity>
                     )}
-                  </View>
+                  </TouchableOpacity>
                   <View style={[styles.miniInputBox, { flex: 1 }]}>
                     <Text style={styles.miniInputIcon}>⏱️</Text>
                     <TextInput
@@ -1011,6 +1011,61 @@ export default function TaskDetailScreen({ route, navigation }: Props) {
                     )}
                   </View>
                 </View>
+
+                {/* Date picker (Android dialog / iOS bottom sheet) */}
+                {showNewSubtaskDatePicker && Platform.OS === 'android' && (
+                  <DateTimePicker
+                    value={newSubtaskDueDate ? new Date(newSubtaskDueDate) : new Date()}
+                    mode="date"
+                    display="calendar"
+                    minimumDate={new Date()}
+                    onChange={(event: DateTimePickerEvent, selected?: Date) => {
+                      setShowNewSubtaskDatePicker(false)
+                      if (event.type === 'set' && selected) {
+                        const ymd = `${selected.getFullYear()}-${String(selected.getMonth() + 1).padStart(2, '0')}-${String(selected.getDate()).padStart(2, '0')}`
+                        setNewSubtaskDueDate(ymd)
+                      }
+                    }}
+                  />
+                )}
+                {Platform.OS === 'ios' && (
+                  <Modal
+                    visible={showNewSubtaskDatePicker}
+                    animationType="slide"
+                    transparent
+                    onRequestClose={() => setShowNewSubtaskDatePicker(false)}
+                  >
+                    <TouchableOpacity
+                      style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.45)' }}
+                      activeOpacity={1}
+                      onPress={() => setShowNewSubtaskDatePicker(false)}
+                    />
+                    <View style={{ backgroundColor: '#fff', paddingBottom: 30, borderTopLeftRadius: 20, borderTopRightRadius: 20 }}>
+                      <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: 14, borderBottomWidth: 1, borderColor: '#eceef0' }}>
+                        <TouchableOpacity onPress={() => setShowNewSubtaskDatePicker(false)}>
+                          <Text style={{ color: '#737c7f', fontSize: 16 }}>Cancel</Text>
+                        </TouchableOpacity>
+                        <Text style={{ fontSize: 16, fontWeight: '600', color: '#191c1e' }}>Due Date</Text>
+                        <TouchableOpacity onPress={() => setShowNewSubtaskDatePicker(false)}>
+                          <Text style={{ color: '#006a66', fontSize: 16, fontWeight: '600' }}>Done</Text>
+                        </TouchableOpacity>
+                      </View>
+                      <DateTimePicker
+                        value={newSubtaskDueDate ? new Date(newSubtaskDueDate) : new Date()}
+                        mode="date"
+                        display="inline"
+                        minimumDate={new Date()}
+                        onChange={(_e: DateTimePickerEvent, selected?: Date) => {
+                          if (selected) {
+                            const ymd = `${selected.getFullYear()}-${String(selected.getMonth() + 1).padStart(2, '0')}-${String(selected.getDate()).padStart(2, '0')}`
+                            setNewSubtaskDueDate(ymd)
+                          }
+                        }}
+                        style={{ alignSelf: 'center' }}
+                      />
+                    </View>
+                  </Modal>
+                )}
               </View>
             </View>
           )}

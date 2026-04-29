@@ -19,6 +19,7 @@ import * as Sharing from 'expo-sharing'
 import AsyncStorage from '@react-native-async-storage/async-storage'
 import { API_BASE_URL } from '../services/api'
 import { taskService } from '../services/taskService'
+import DateTimePicker, { type DateTimePickerEvent } from '@react-native-community/datetimepicker'
 import type { Subtask, SubtaskNote, SubtaskStatus, User } from '../types'
 
 // Teal palette to match web SubtaskDetailModal
@@ -448,32 +449,68 @@ export default function SubtaskDetailSheet({
                 {/* Due date */}
                 <View>
                   <Text style={styles.label}>Due date</Text>
-                  {editingDue && isAdmin ? (
-                    <View style={styles.fieldRow}>
-                      <TextInput
-                        style={styles.inlineInput}
-                        value={dueInput}
-                        onChangeText={setDueInput}
-                        placeholder="YYYY-MM-DD"
-                        placeholderTextColor={C.faint}
-                        autoFocus
-                        autoCapitalize="none"
-                      />
-                      <TouchableOpacity style={styles.inlineSaveBtn} onPress={saveDue} disabled={savingDue}>
-                        {savingDue ? <ActivityIndicator size="small" color="#fff" /> : <Text style={styles.inlineSaveText}>Save</Text>}
-                      </TouchableOpacity>
-                    </View>
-                  ) : (
-                    <TouchableOpacity
-                      style={styles.fieldRow}
-                      onPress={() => isAdmin && setEditingDue(true)}
-                      disabled={!isAdmin}
-                    >
-                      <Text style={[styles.fieldValue, !subtask.dueDate && { color: C.faint }]}>
-                        {subtask.dueDate ? formatDate(subtask.dueDate) : 'Not set'}
-                      </Text>
-                      {isAdmin && <Text style={styles.chevron}>›</Text>}
-                    </TouchableOpacity>
+                  <TouchableOpacity
+                    style={styles.fieldRow}
+                    onPress={() => isAdmin && setEditingDue(true)}
+                    disabled={!isAdmin || savingDue}
+                  >
+                    <Text style={[styles.fieldValue, !subtask.dueDate && { color: C.faint }]}>
+                      {subtask.dueDate ? formatDate(subtask.dueDate) : 'Not set'}
+                    </Text>
+                    {savingDue
+                      ? <ActivityIndicator size="small" color={C.primary} />
+                      : isAdmin && <Text style={styles.chevron}>›</Text>}
+                  </TouchableOpacity>
+                  {editingDue && isAdmin && Platform.OS === 'android' && (
+                    <DateTimePicker
+                      value={dueInput ? new Date(dueInput) : new Date()}
+                      mode="date"
+                      display="calendar"
+                      onChange={(event: DateTimePickerEvent, selected?: Date) => {
+                        setEditingDue(false)
+                        if (event.type === 'set' && selected) {
+                          const ymd = `${selected.getFullYear()}-${String(selected.getMonth() + 1).padStart(2, '0')}-${String(selected.getDate()).padStart(2, '0')}`
+                          setDueInput(ymd)
+                          persist({ dueDate: ymd }, setSavingDue)
+                        }
+                      }}
+                    />
+                  )}
+                  {editingDue && isAdmin && Platform.OS === 'ios' && (
+                    <Modal visible transparent animationType="slide" onRequestClose={() => setEditingDue(false)}>
+                      <TouchableOpacity style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.45)' }} activeOpacity={1} onPress={() => setEditingDue(false)} />
+                      <View style={{ backgroundColor: '#fff', paddingBottom: 30, borderTopLeftRadius: 20, borderTopRightRadius: 20 }}>
+                        <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: 14, borderBottomWidth: 1, borderColor: C.border }}>
+                          <TouchableOpacity onPress={() => setEditingDue(false)}>
+                            <Text style={{ color: C.muted, fontSize: 16 }}>Cancel</Text>
+                          </TouchableOpacity>
+                          <Text style={{ fontSize: 16, fontWeight: '600', color: C.text }}>Due Date</Text>
+                          <TouchableOpacity onPress={() => { setEditingDue(false); persist({ dueDate: dueInput || null }, setSavingDue) }}>
+                            <Text style={{ color: C.primary, fontSize: 16, fontWeight: '600' }}>Done</Text>
+                          </TouchableOpacity>
+                        </View>
+                        <DateTimePicker
+                          value={dueInput ? new Date(dueInput) : new Date()}
+                          mode="date"
+                          display="inline"
+                          onChange={(_e: DateTimePickerEvent, selected?: Date) => {
+                            if (selected) {
+                              const ymd = `${selected.getFullYear()}-${String(selected.getMonth() + 1).padStart(2, '0')}-${String(selected.getDate()).padStart(2, '0')}`
+                              setDueInput(ymd)
+                            }
+                          }}
+                          style={{ alignSelf: 'center' }}
+                        />
+                        {dueInput ? (
+                          <TouchableOpacity
+                            style={{ alignSelf: 'center', paddingVertical: 10, paddingHorizontal: 20 }}
+                            onPress={() => { setDueInput(''); setEditingDue(false); persist({ dueDate: null }, setSavingDue) }}
+                          >
+                            <Text style={{ color: C.danger, fontSize: 14, fontWeight: '600' }}>Clear due date</Text>
+                          </TouchableOpacity>
+                        ) : null}
+                      </View>
+                    </Modal>
                   )}
                 </View>
 
