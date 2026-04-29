@@ -5,7 +5,11 @@ export const API_BASE_URL = 'https://decon-api.onrender.com'
 
 const api = axios.create({
   baseURL: API_BASE_URL,
-  headers: { 'Content-Type': 'application/json' },
+  headers: {
+    'Content-Type': 'application/json',
+    // Tells backend to issue a long-lived (90d) JWT instead of the 24h web token.
+    'X-Client': 'mobile',
+  },
   timeout: 15000,
 })
 
