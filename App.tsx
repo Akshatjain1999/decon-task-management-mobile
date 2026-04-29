@@ -1,4 +1,5 @@
 import React, { useEffect, useRef } from 'react'
+import { ToastAndroid, Platform, Alert } from 'react-native'
 import { NavigationContainer } from '@react-navigation/native'
 import { Provider } from 'react-redux'
 import { SafeAreaProvider } from 'react-native-safe-area-context'
@@ -6,7 +7,8 @@ import Constants from 'expo-constants'
 import { store } from './src/store'
 import AppNavigator from './src/navigation/AppNavigator'
 import { useAppDispatch, useAppSelector } from './src/store/hooks'
-import { restoreSession } from './src/store/authSlice'
+import { restoreSession, logout } from './src/store/authSlice'
+import { setOnSessionExpired } from './src/services/api'
 import { registerPushToken, setupNotificationHandler, addNotificationTapListener } from './src/services/pushTokenService'
 
 function Root() {
@@ -17,6 +19,21 @@ function Root() {
   // Restore session on mount
   useEffect(() => {
     dispatch(restoreSession())
+  }, [dispatch])
+
+  // Wire global session-expired handler — when api.ts sees a 401 it will
+  // call this, we dispatch logout (which clears token in redux) and the
+  // navigator automatically swaps to the Login stack.
+  useEffect(() => {
+    setOnSessionExpired(() => {
+      dispatch(logout())
+      if (Platform.OS === 'android') {
+        ToastAndroid.show('Session expired. Please log in again.', ToastAndroid.LONG)
+      } else {
+        Alert.alert('Session expired', 'Please log in again.')
+      }
+    })
+    return () => setOnSessionExpired(null)
   }, [dispatch])
 
   // Register push token whenever user is authenticated

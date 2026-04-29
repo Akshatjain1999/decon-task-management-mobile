@@ -3,6 +3,15 @@ import AsyncStorage from '@react-native-async-storage/async-storage'
 
 export const API_BASE_URL = 'https://decon-api.onrender.com'
 
+// Hook for the app to react to session expiry (e.g. dispatch redux logout +
+// reset navigation to Login). Set once during app bootstrap.
+let onSessionExpired: (() => void) | null = null
+export function setOnSessionExpired(handler: (() => void) | null) {
+  onSessionExpired = handler
+}
+
+let expiredFired = false
+
 const api = axios.create({
   baseURL: API_BASE_URL,
   headers: {
@@ -34,6 +43,14 @@ api.interceptors.response.use(
     if (error.response?.status === 401) {
       await AsyncStorage.removeItem('auth_token')
       await AsyncStorage.removeItem('auth_user')
+      // Fire once per expiry burst — many in-flight requests may all 401 at
+      // the same time; we only want one redirect to Login.
+      if (!expiredFired) {
+        expiredFired = true
+        try { onSessionExpired?.() } catch (e) { /* swallow */ }
+        // Reset the latch shortly after so a future expiry can fire again.
+        setTimeout(() => { expiredFired = false }, 2000)
+      }
     }
     // Debug: log full error details to Metro console
     console.warn('[API ERROR]', {
