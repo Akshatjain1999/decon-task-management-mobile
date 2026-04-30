@@ -1,5 +1,5 @@
 import api from './api'
-import type { DashboardStats, SuperAdminDashboard, TaskTypeDashboard, PipelineTaskItem } from '../types'
+import type { DashboardStats, SuperAdminDashboard, TaskTypeDashboard, PipelineTaskItem, MyDashboard, MySubtaskFilter, MySubtaskListItem } from '../types'
 
 export const dashboardService = {
   async getStats(): Promise<DashboardStats> {
@@ -9,6 +9,18 @@ export const dashboardService = {
 
   async getSuperAdminDashboard(): Promise<SuperAdminDashboard> {
     const res = await api.get<SuperAdminDashboard>('/api/v1/dashboard/super-admin')
+    return res.data
+  },
+
+  async getMyDashboard(): Promise<MyDashboard> {
+    const res = await api.get<MyDashboard>('/api/v1/dashboard/my')
+    return res.data
+  },
+
+  async getMySubtasks(filter: MySubtaskFilter): Promise<MySubtaskListItem[]> {
+    const res = await api.get<MySubtaskListItem[]>('/api/v1/dashboard/my/subtasks', {
+      params: { filter },
+    })
     return res.data
   },
 

@@ -257,3 +257,47 @@ export interface SuperAdminDashboard {
   taskTypeBreakdown: Record<string, TaskTypeBreakdown>
   topOwners: OwnerSubtaskStat[]
 }
+
+export interface MyDashboard {
+  assignedTotal: number
+  assignedOpen: number
+  assignedInProgress: number
+  assignedCompleted: number
+  assignedOverdue: number
+  assignedCompletionRate: number
+  tasksByType: Record<string, number>
+  mySubtasksTotal: number
+  mySubtasksCompleted: number
+  mySubtasksPending: number
+  mySubtaskCompletionRate: number
+  mySubtasksToday: number
+  mySubtasksOverdue: number
+  mySubtasksInProgress: number
+  mySubtasksTodo: number
+  mySubtasksUpcoming: number
+  mySubtasksCompletedThisWeek: number
+  mySubtasksNoDates: number
+}
+
+export type MySubtaskFilter =
+  | 'TODAY'
+  | 'OVERDUE'
+  | 'IN_PROGRESS'
+  | 'TODO'
+  | 'UPCOMING'
+  | 'COMPLETED_WEEK'
+  | 'NO_DATES'
+
+export interface MySubtaskListItem {
+  id: number
+  title: string
+  status: SubtaskStatus
+  startDate: string | null
+  endDate: string | null
+  estimatedMinutes: number | null
+  completedAt: string | null
+  taskId: number | null
+  taskTitle: string | null
+  taskType: string | null
+  taskPriority: string | null
+}

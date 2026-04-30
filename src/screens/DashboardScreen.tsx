@@ -12,7 +12,7 @@ import { SafeAreaView } from 'react-native-safe-area-context'
 import { useNavigation } from '@react-navigation/native'
 import { useAppSelector } from '../store/hooks'
 import { dashboardService } from '../services/dashboardService'
-import type { SuperAdminDashboard, DashboardStats, TaskTypeBreakdown } from '../types'
+import type { SuperAdminDashboard, DashboardStats, TaskTypeBreakdown, MyDashboard, MySubtaskFilter, MySubtaskListItem } from '../types'
 
 // ─── helpers ─────────────────────────────────────────────────────────────────
 
@@ -21,6 +21,12 @@ function getGreeting(): string {
   if (h < 12) return 'Good morning'
   if (h < 17) return 'Good afternoon'
   return 'Good evening'
+}
+
+function formatShortDate(d?: string | null): string {
+  if (!d) return '—'
+  const date = new Date(d.length <= 10 ? `${d}T00:00:00` : d)
+  return date.toLocaleDateString(undefined, { month: 'short', day: 'numeric' })
 }
 
 const TASK_TYPE_META: Record<string, { label: string; color: string; bg: string }> = {
@@ -248,8 +254,12 @@ export default function DashboardScreen() {
 
   const [data, setData] = useState<SuperAdminDashboard | null>(null)
   const [basicStats, setBasicStats] = useState<DashboardStats | null>(null)
+  const [myData, setMyData] = useState<MyDashboard | null>(null)
   const [loading, setLoading] = useState(true)
   const [refreshing, setRefreshing] = useState(false)
+  const [expandedBucket, setExpandedBucket] = useState<MySubtaskFilter | null>(null)
+  const [bucketCache, setBucketCache] = useState<Partial<Record<MySubtaskFilter, MySubtaskListItem[]>>>({})
+  const [bucketLoading, setBucketLoading] = useState<MySubtaskFilter | null>(null)
 
   const load = useCallback(async () => {
     try {
@@ -257,8 +267,13 @@ export default function DashboardScreen() {
         const d = await dashboardService.getSuperAdminDashboard()
         setData(d)
       } else {
-        const d = await dashboardService.getStats()
-        setBasicStats(d)
+        const [my, stats] = await Promise.all([
+          dashboardService.getMyDashboard(),
+          dashboardService.getStats().catch(() => null),
+        ])
+        setMyData(my)
+        if (stats) setBasicStats(stats)
+        setBucketCache({}) // refresh on reload
       }
     } catch {
       // silently show empty state
@@ -280,8 +295,42 @@ export default function DashboardScreen() {
     )
   }
 
-  // ── Non-super-admin basic dashboard ──────────────────────────────────────
+  // ── Non-super-admin: my-dashboard ────────────────────────────────────────
   if (!isSuperAdmin) {
+    const my = myData
+    const toggleBucket = async (filter: MySubtaskFilter) => {
+      if (expandedBucket === filter) { setExpandedBucket(null); return }
+      setExpandedBucket(filter)
+      if (bucketCache[filter]) return
+      setBucketLoading(filter)
+      try {
+        const items = await dashboardService.getMySubtasks(filter)
+        setBucketCache((c) => ({ ...c, [filter]: items }))
+      } catch {
+        setBucketCache((c) => ({ ...c, [filter]: [] }))
+      } finally {
+        setBucketLoading(null)
+      }
+    }
+
+    const buckets: Array<{
+      filter: MySubtaskFilter
+      count: number
+      label: string
+      hint: string
+      icon: string
+      color: string
+      bg: string
+    }> = my ? [
+      { filter: 'TODAY',          count: my.mySubtasksToday,             label: 'Today',           hint: 'Active today (start ≤ today ≤ end)', icon: '📅', color: '#006a66', bg: '#e8faf9' },
+      { filter: 'OVERDUE',        count: my.mySubtasksOverdue,           label: 'Overdue',         hint: 'End date already passed',             icon: '⚠️', color: '#ba1a1a', bg: '#ffdad6' },
+      { filter: 'IN_PROGRESS',    count: my.mySubtasksInProgress,        label: 'In progress',     hint: 'Currently being worked on',           icon: '🔄', color: '#180092', bg: '#f0eeff' },
+      { filter: 'TODO',           count: my.mySubtasksTodo,              label: 'To do',           hint: 'Not yet started',                     icon: '⭕', color: '#44474c', bg: '#f0f1f2' },
+      { filter: 'UPCOMING',       count: my.mySubtasksUpcoming,          label: 'Upcoming',        hint: 'Starting in the next 7 days',         icon: '🗓️', color: '#1a73e8', bg: '#e6f0fe' },
+      { filter: 'COMPLETED_WEEK', count: my.mySubtasksCompletedThisWeek, label: 'Completed (7d)',  hint: 'Done in the last 7 days',             icon: '✅', color: '#006a66', bg: '#e8faf9' },
+      { filter: 'NO_DATES',       count: my.mySubtasksNoDates,           label: 'No dates set',    hint: 'Need start & end dates',              icon: '🚫', color: '#bf6d00', bg: '#fff4ec' },
+    ] : []
+
     return (
       <SafeAreaView style={{ flex: 1, backgroundColor: '#f7f9fb' }} edges={['top']}>
         <ScrollView
@@ -289,19 +338,114 @@ export default function DashboardScreen() {
           refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
         >
           <View style={styles.headerSection}>
-            <Text style={styles.roleLabel}>Overview</Text>
+            <Text style={styles.roleLabel}>{(user?.role ?? '').replace('_', ' ')} · My workspace</Text>
             <Text style={styles.greeting}>{getGreeting()}, {user?.name?.split(' ')[0]}.</Text>
+            {my && (
+              <Text style={{ color: '#44474c', fontSize: 13, marginTop: 4 }}>
+                {my.assignedTotal > 0
+                  ? `${my.assignedTotal} assigned tasks · ${my.assignedInProgress} in progress${my.assignedOverdue > 0 ? ` · ${my.assignedOverdue} overdue` : ''}`
+                  : 'No tasks assigned to you yet.'}
+              </Text>
+            )}
           </View>
-          <View style={styles.kpiGrid}>
-            {[
-              { label: 'Total Tasks',  value: basicStats?.totalTasks ?? '—',      accent: '#041627' },
-              { label: 'Completed',    value: basicStats?.completedTasks ?? '—',  accent: '#006a66' },
-              { label: 'In Progress',  value: basicStats?.inProgressTasks ?? '—', accent: '#180092' },
-              { label: 'Open',         value: basicStats?.openTasks ?? '—',        accent: '#e0e3e5' },
-              { label: 'Overdue',      value: basicStats?.overdueTasks ?? '—',     accent: '#ba1a1a' },
-              { label: 'Team Members', value: basicStats?.totalUsers ?? '—',       accent: '#7d3600' },
-            ].map((c) => <StatCard key={c.label} {...c} />)}
-          </View>
+
+          {/* Assigned tasks summary */}
+          {my && (
+            <View style={styles.kpiGrid}>
+              {[
+                { label: 'Assigned',     value: my.assignedTotal,         accent: '#041627' },
+                { label: 'In Progress',  value: my.assignedInProgress,    accent: '#180092' },
+                { label: 'Completed',    value: my.assignedCompleted,     accent: '#006a66' },
+                { label: 'Overdue',      value: my.assignedOverdue,       accent: '#ba1a1a' },
+              ].map((c) => <StatCard key={c.label} {...c} />)}
+            </View>
+          )}
+
+          {/* Subtask totals */}
+          {my && my.mySubtasksTotal > 0 && (
+            <>
+              <Text style={styles.sectionTitle}>My subtask action board</Text>
+              <View style={[styles.kpiGrid, { marginBottom: 4 }]}>
+                <StatCard label="Subtasks"  value={my.mySubtasksTotal}     accent="#041627" />
+                <StatCard label="Done"      value={my.mySubtasksCompleted} accent="#006a66" sub={`${my.mySubtaskCompletionRate}%`} />
+                <StatCard label="Pending"   value={my.mySubtasksPending}   accent="#bf6d00" />
+              </View>
+
+              {buckets.map((b) => {
+                const open = expandedBucket === b.filter
+                const items = bucketCache[b.filter]
+                const isLoading = bucketLoading === b.filter
+                const empty = b.count === 0
+                return (
+                  <View key={b.filter} style={[styles.bucketCard, empty && { opacity: 0.55 }]}>
+                    <TouchableOpacity
+                      onPress={() => !empty && toggleBucket(b.filter)}
+                      disabled={empty}
+                      activeOpacity={0.7}
+                      style={styles.bucketHeader}
+                    >
+                      <View style={[styles.bucketIcon, { backgroundColor: b.bg }]}>
+                        <Text style={{ fontSize: 18 }}>{b.icon}</Text>
+                      </View>
+                      <View style={{ flex: 1 }}>
+                        <View style={{ flexDirection: 'row', alignItems: 'baseline', gap: 8 }}>
+                          <Text style={styles.bucketCount}>{b.count}</Text>
+                          <Text style={styles.bucketLabel}>{b.label}</Text>
+                        </View>
+                        <Text style={styles.bucketHint}>{b.hint}</Text>
+                      </View>
+                      {!empty && <Text style={styles.bucketChevron}>{open ? '▾' : '▸'}</Text>}
+                    </TouchableOpacity>
+
+                    {open && !empty && (
+                      <View style={styles.bucketBody}>
+                        {isLoading && (
+                          <View style={{ paddingVertical: 14, alignItems: 'center' }}>
+                            <ActivityIndicator size="small" color="#006a66" />
+                          </View>
+                        )}
+                        {!isLoading && items && items.length === 0 && (
+                          <Text style={styles.bucketEmpty}>No subtasks in this bucket.</Text>
+                        )}
+                        {!isLoading && items && items.length > 0 && items.map((s) => (
+                          <TouchableOpacity
+                            key={s.id}
+                            style={styles.bucketItem}
+                            activeOpacity={0.7}
+                            onPress={() => s.taskId != null && navigation.navigate('TaskDetail', { taskId: s.taskId })}
+                          >
+                            <View style={{ flex: 1 }}>
+                              <Text style={styles.bucketItemTitle} numberOfLines={1}>{s.title}</Text>
+                              <Text style={styles.bucketItemSub} numberOfLines={1}>
+                                {s.taskTitle ?? 'Task'}
+                                {(s.startDate || s.endDate) ? ` · ${formatShortDate(s.startDate)} → ${formatShortDate(s.endDate)}` : ''}
+                                {s.completedAt ? ` · ✓ ${formatShortDate(s.completedAt)}` : ''}
+                              </Text>
+                            </View>
+                            <Text style={styles.bucketItemArrow}>›</Text>
+                          </TouchableOpacity>
+                        ))}
+                      </View>
+                    )}
+                  </View>
+                )
+              })}
+            </>
+          )}
+
+          {/* If no my-dashboard yet, fall back to global stats */}
+          {!my && basicStats && (
+            <View style={styles.kpiGrid}>
+              {[
+                { label: 'Total Tasks',  value: basicStats.totalTasks,      accent: '#041627' },
+                { label: 'Completed',    value: basicStats.completedTasks,  accent: '#006a66' },
+                { label: 'In Progress',  value: basicStats.inProgressTasks, accent: '#180092' },
+                { label: 'Open',         value: basicStats.openTasks,       accent: '#e0e3e5' },
+                { label: 'Overdue',      value: basicStats.overdueTasks,    accent: '#ba1a1a' },
+                { label: 'Team Members', value: basicStats.totalUsers,      accent: '#7d3600' },
+              ].map((c) => <StatCard key={c.label} {...c} />)}
+            </View>
+          )}
         </ScrollView>
       </SafeAreaView>
     )
@@ -586,4 +730,31 @@ const styles = StyleSheet.create({
   performerBarBg: { flex: 1, height: 6, backgroundColor: '#e0e3e5', borderRadius: 3, overflow: 'hidden' },
   performerBarFill: { height: 6, backgroundColor: '#006a66', borderRadius: 3 },
   performerPct: { fontSize: 9, fontWeight: '700', color: '#041627', width: 30, textAlign: 'right' },
+
+  // ── Bucket cards (my dashboard) ──────────────────────────────────────────
+  bucketCard: {
+    backgroundColor: '#fff',
+    borderRadius: 14,
+    marginBottom: 10,
+    borderWidth: 1,
+    borderColor: '#eceef0',
+    shadowColor: '#041627',
+    shadowOpacity: 0.05,
+    shadowRadius: 8,
+    shadowOffset: { width: 0, height: 2 },
+    elevation: 1,
+    overflow: 'hidden',
+  },
+  bucketHeader: { flexDirection: 'row', alignItems: 'center', padding: 14, gap: 12 },
+  bucketIcon: { width: 40, height: 40, borderRadius: 10, alignItems: 'center', justifyContent: 'center' },
+  bucketCount: { fontSize: 22, fontWeight: '800', color: '#041627' },
+  bucketLabel: { fontSize: 14, fontWeight: '600', color: '#041627' },
+  bucketHint: { fontSize: 11, color: '#737c7f', marginTop: 2 },
+  bucketChevron: { fontSize: 16, color: '#737c7f' },
+  bucketBody: { borderTopWidth: 1, borderColor: '#eceef0', backgroundColor: '#fafbfb' },
+  bucketEmpty: { padding: 14, fontSize: 13, color: '#737c7f', fontStyle: 'italic' },
+  bucketItem: { flexDirection: 'row', alignItems: 'center', padding: 12, borderBottomWidth: 1, borderColor: '#eceef0' },
+  bucketItemTitle: { fontSize: 13, fontWeight: '600', color: '#041627' },
+  bucketItemSub: { fontSize: 11, color: '#737c7f', marginTop: 2 },
+  bucketItemArrow: { fontSize: 18, color: '#9aa0a6', marginLeft: 8 },
 })
