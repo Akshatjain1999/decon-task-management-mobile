@@ -53,13 +53,13 @@ export const taskService = {
     taskId: number,
     title: string,
     ownerId?: number | null,
-    dueDate?: string | null,
+    startDate?: string | null,
     estimatedMinutes?: number | null,
     description?: string | null,
   ): Promise<Subtask> {
     const body: Record<string, unknown> = { title }
     if (ownerId) body.ownerId = ownerId
-    if (dueDate) body.dueDate = dueDate
+    if (startDate) body.startDate = startDate
     if (estimatedMinutes != null) body.estimatedMinutes = estimatedMinutes
     if (description != null) body.description = description
     const res = await api.post<Subtask>(`/api/v1/tasks/${taskId}/subtasks`, body)
@@ -83,7 +83,7 @@ export const taskService = {
     subtaskId: number,
     title: string,
     ownerId?: number | null,
-    dueDate?: string | null,
+    startDate?: string | null,
     estimatedMinutes?: number | null,
     description?: string | null,
   ): Promise<Subtask> {
@@ -91,7 +91,7 @@ export const taskService = {
     const body: Record<string, unknown> = {
       title,
       ownerId: ownerId ?? null,
-      dueDate: dueDate || null,
+      startDate: startDate || null,
       estimatedMinutes: estimatedMinutes ?? null,
     }
     if (description !== undefined) body.description = description

@@ -110,13 +110,13 @@ export default function SubtaskDetailSheet({
 
   const [savingStatus, setSavingStatus] = useState(false)
   const [savingOwner, setSavingOwner] = useState(false)
-  const [savingDue, setSavingDue] = useState(false)
+  const [savingStart, setSavingStart] = useState(false)
   const [savingEstimate, setSavingEstimate] = useState(false)
 
   const [showStatusPicker, setShowStatusPicker] = useState(false)
   const [showOwnerPicker, setShowOwnerPicker] = useState(false)
-  const [dueInput, setDueInput] = useState('')
-  const [editingDue, setEditingDue] = useState(false)
+  const [startInput, setStartInput] = useState('')
+  const [editingStart, setEditingStart] = useState(false)
   const [estimateInput, setEstimateInput] = useState('')
   const [editingEstimate, setEditingEstimate] = useState(false)
 
@@ -143,9 +143,9 @@ export default function SubtaskDetailSheet({
     setDescription(subtask.description ?? '')
     setEditingTitle(false)
     setEditingDesc(false)
-    setEditingDue(false)
+    setEditingStart(false)
     setEditingEstimate(false)
-    setDueInput(subtask.dueDate ?? '')
+    setStartInput(subtask.startDate ?? '')
     setEstimateInput(subtask.estimatedMinutes != null ? String(subtask.estimatedMinutes / 60) : '')
     setNoteText('')
     setNoteAttachment(null)
@@ -168,7 +168,7 @@ export default function SubtaskDetailSheet({
 
   // ── Save helpers ──────────────────────────────────────────────────────
   const persist = async (
-    patch: { title?: string; ownerId?: number | null; dueDate?: string | null; estimatedMinutes?: number | null; description?: string | null | undefined },
+    patch: { title?: string; ownerId?: number | null; startDate?: string | null; estimatedMinutes?: number | null; description?: string | null | undefined },
     setLoading: (v: boolean) => void,
   ) => {
     setLoading(true)
@@ -178,7 +178,7 @@ export default function SubtaskDetailSheet({
         subtask.id,
         patch.title ?? subtask.title,
         patch.ownerId !== undefined ? patch.ownerId : subtask.ownerId ?? null,
-        patch.dueDate !== undefined ? patch.dueDate : subtask.dueDate ?? null,
+        patch.startDate !== undefined ? patch.startDate : subtask.startDate ?? null,
         patch.estimatedMinutes !== undefined ? patch.estimatedMinutes : subtask.estimatedMinutes ?? null,
         patch.description,
       )
@@ -222,10 +222,10 @@ export default function SubtaskDetailSheet({
     await persist({ ownerId: userId }, setSavingOwner)
   }
 
-  const saveDue = async () => {
-    const v = dueInput.trim()
-    await persist({ dueDate: v || null }, setSavingDue)
-    setEditingDue(false)
+  const saveStart = async () => {
+    const v = startInput.trim()
+    await persist({ startDate: v || null }, setSavingStart)
+    setEditingStart(false)
   }
 
   const saveEstimate = async () => {
@@ -446,67 +446,67 @@ export default function SubtaskDetailSheet({
                   </TouchableOpacity>
                 </View>
 
-                {/* Due date */}
+                {/* Start date */}
                 <View>
-                  <Text style={styles.label}>Due date</Text>
+                  <Text style={styles.label}>Start date</Text>
                   <TouchableOpacity
                     style={styles.fieldRow}
-                    onPress={() => isAdmin && setEditingDue(true)}
-                    disabled={!isAdmin || savingDue}
+                    onPress={() => isAdmin && setEditingStart(true)}
+                    disabled={!isAdmin || savingStart}
                   >
-                    <Text style={[styles.fieldValue, !subtask.dueDate && { color: C.faint }]}>
-                      {subtask.dueDate ? formatDate(subtask.dueDate) : 'Not set'}
+                    <Text style={[styles.fieldValue, !subtask.startDate && { color: C.faint }]}>
+                      {subtask.startDate ? formatDate(subtask.startDate) : 'Not set'}
                     </Text>
-                    {savingDue
+                    {savingStart
                       ? <ActivityIndicator size="small" color={C.primary} />
                       : isAdmin && <Text style={styles.chevron}>›</Text>}
                   </TouchableOpacity>
-                  {editingDue && isAdmin && Platform.OS === 'android' && (
+                  {editingStart && isAdmin && Platform.OS === 'android' && (
                     <DateTimePicker
-                      value={dueInput ? new Date(dueInput) : new Date()}
+                      value={startInput ? new Date(startInput) : new Date()}
                       mode="date"
                       display="calendar"
                       onChange={(event: DateTimePickerEvent, selected?: Date) => {
-                        setEditingDue(false)
+                        setEditingStart(false)
                         if (event.type === 'set' && selected) {
                           const ymd = `${selected.getFullYear()}-${String(selected.getMonth() + 1).padStart(2, '0')}-${String(selected.getDate()).padStart(2, '0')}`
-                          setDueInput(ymd)
-                          persist({ dueDate: ymd }, setSavingDue)
+                          setStartInput(ymd)
+                          persist({ startDate: ymd }, setSavingStart)
                         }
                       }}
                     />
                   )}
-                  {editingDue && isAdmin && Platform.OS === 'ios' && (
-                    <Modal visible transparent animationType="slide" onRequestClose={() => setEditingDue(false)}>
-                      <TouchableOpacity style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.45)' }} activeOpacity={1} onPress={() => setEditingDue(false)} />
+                  {editingStart && isAdmin && Platform.OS === 'ios' && (
+                    <Modal visible transparent animationType="slide" onRequestClose={() => setEditingStart(false)}>
+                      <TouchableOpacity style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.45)' }} activeOpacity={1} onPress={() => setEditingStart(false)} />
                       <View style={{ backgroundColor: '#fff', paddingBottom: 30, borderTopLeftRadius: 20, borderTopRightRadius: 20 }}>
                         <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: 14, borderBottomWidth: 1, borderColor: C.border }}>
-                          <TouchableOpacity onPress={() => setEditingDue(false)}>
+                          <TouchableOpacity onPress={() => setEditingStart(false)}>
                             <Text style={{ color: C.muted, fontSize: 16 }}>Cancel</Text>
                           </TouchableOpacity>
-                          <Text style={{ fontSize: 16, fontWeight: '600', color: C.text }}>Due Date</Text>
-                          <TouchableOpacity onPress={() => { setEditingDue(false); persist({ dueDate: dueInput || null }, setSavingDue) }}>
+                          <Text style={{ fontSize: 16, fontWeight: '600', color: C.text }}>Start Date</Text>
+                          <TouchableOpacity onPress={() => { setEditingStart(false); persist({ startDate: startInput || null }, setSavingStart) }}>
                             <Text style={{ color: C.primary, fontSize: 16, fontWeight: '600' }}>Done</Text>
                           </TouchableOpacity>
                         </View>
                         <DateTimePicker
-                          value={dueInput ? new Date(dueInput) : new Date()}
+                          value={startInput ? new Date(startInput) : new Date()}
                           mode="date"
                           display="inline"
                           onChange={(_e: DateTimePickerEvent, selected?: Date) => {
                             if (selected) {
                               const ymd = `${selected.getFullYear()}-${String(selected.getMonth() + 1).padStart(2, '0')}-${String(selected.getDate()).padStart(2, '0')}`
-                              setDueInput(ymd)
+                              setStartInput(ymd)
                             }
                           }}
                           style={{ alignSelf: 'center' }}
                         />
-                        {dueInput ? (
+                        {startInput ? (
                           <TouchableOpacity
                             style={{ alignSelf: 'center', paddingVertical: 10, paddingHorizontal: 20 }}
-                            onPress={() => { setDueInput(''); setEditingDue(false); persist({ dueDate: null }, setSavingDue) }}
+                            onPress={() => { setStartInput(''); setEditingStart(false); persist({ startDate: null }, setSavingStart) }}
                           >
-                            <Text style={{ color: C.danger, fontSize: 14, fontWeight: '600' }}>Clear due date</Text>
+                            <Text style={{ color: C.danger, fontSize: 14, fontWeight: '600' }}>Clear start date</Text>
                           </TouchableOpacity>
                         ) : null}
                       </View>

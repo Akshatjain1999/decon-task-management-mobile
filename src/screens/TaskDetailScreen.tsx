@@ -140,7 +140,7 @@ export default function TaskDetailScreen({ route, navigation }: Props) {
   const [reassigningSubtask, setReassigningSubtask] = useState<number | null>(null)
 
   const [newSubtask, setNewSubtask] = useState('')
-  const [newSubtaskDueDate, setNewSubtaskDueDate] = useState<string>('')
+  const [newSubtaskStartDate, setNewSubtaskStartDate] = useState<string>('')
   const [showNewSubtaskDatePicker, setShowNewSubtaskDatePicker] = useState(false)
   const [newSubtaskEstimate, setNewSubtaskEstimate] = useState<string>('')
   const [addingSubtask, setAddingSubtask] = useState(false)
@@ -452,7 +452,7 @@ export default function TaskDetailScreen({ route, navigation }: Props) {
     if (!task || !newSubtask.trim()) return
     setAddingSubtask(true)
     try {
-      const dueDate = newSubtaskDueDate.trim() || null
+      const startDate = newSubtaskStartDate.trim() || null
       const estimate = newSubtaskEstimate.trim()
         ? (() => {
             const num = parseFloat(newSubtaskEstimate.trim())
@@ -463,13 +463,13 @@ export default function TaskDetailScreen({ route, navigation }: Props) {
         task.id,
         newSubtask.trim(),
         newSubtaskOwnerId,
-        dueDate,
+        startDate,
         estimate,
       )
       setTask((prev) => prev ? { ...prev, subtasks: [...prev.subtasks, subtask], subtasksTotal: prev.subtasksTotal + 1 } : prev)
       setNewSubtask('')
       setNewSubtaskOwnerId(null)
-      setNewSubtaskDueDate('')
+      setNewSubtaskStartDate('')
       setNewSubtaskEstimate('')
     } catch (e: any) {
       showToast(e?.message || 'Failed to add subtask')
@@ -977,7 +977,7 @@ export default function TaskDetailScreen({ route, navigation }: Props) {
                   )}
                 </TouchableOpacity>
 
-                {/* Due date + estimate inputs */}
+                {/* Start date + estimate inputs */}
                 <View style={{ flexDirection: 'row', gap: 6 }}>
                   <TouchableOpacity
                     style={[styles.miniInputBox, { flex: 1.2 }]}
@@ -985,11 +985,11 @@ export default function TaskDetailScreen({ route, navigation }: Props) {
                     activeOpacity={0.7}
                   >
                     <Text style={styles.miniInputIcon}>📅</Text>
-                    <Text style={[styles.miniInput, { color: newSubtaskDueDate ? '#191c1e' : '#aaa' }]}>
-                      {newSubtaskDueDate || 'Due date'}
+                    <Text style={[styles.miniInput, { color: newSubtaskStartDate ? '#191c1e' : '#aaa' }]}>
+                      {newSubtaskStartDate || 'Start date'}
                     </Text>
-                    {newSubtaskDueDate.length > 0 && (
-                      <TouchableOpacity onPress={(e) => { e.stopPropagation?.(); setNewSubtaskDueDate('') }}>
+                    {newSubtaskStartDate.length > 0 && (
+                      <TouchableOpacity onPress={(e) => { e.stopPropagation?.(); setNewSubtaskStartDate('') }}>
                         <Text style={{ color: '#ba1a1a', fontSize: 12 }}>✕</Text>
                       </TouchableOpacity>
                     )}
@@ -1015,7 +1015,7 @@ export default function TaskDetailScreen({ route, navigation }: Props) {
                 {/* Date picker (Android dialog / iOS bottom sheet) */}
                 {showNewSubtaskDatePicker && Platform.OS === 'android' && (
                   <DateTimePicker
-                    value={newSubtaskDueDate ? new Date(newSubtaskDueDate) : new Date()}
+                    value={newSubtaskStartDate ? new Date(newSubtaskStartDate) : new Date()}
                     mode="date"
                     display="calendar"
                     minimumDate={new Date()}
@@ -1023,7 +1023,7 @@ export default function TaskDetailScreen({ route, navigation }: Props) {
                       setShowNewSubtaskDatePicker(false)
                       if (event.type === 'set' && selected) {
                         const ymd = `${selected.getFullYear()}-${String(selected.getMonth() + 1).padStart(2, '0')}-${String(selected.getDate()).padStart(2, '0')}`
-                        setNewSubtaskDueDate(ymd)
+                        setNewSubtaskStartDate(ymd)
                       }
                     }}
                   />
@@ -1045,20 +1045,20 @@ export default function TaskDetailScreen({ route, navigation }: Props) {
                         <TouchableOpacity onPress={() => setShowNewSubtaskDatePicker(false)}>
                           <Text style={{ color: '#737c7f', fontSize: 16 }}>Cancel</Text>
                         </TouchableOpacity>
-                        <Text style={{ fontSize: 16, fontWeight: '600', color: '#191c1e' }}>Due Date</Text>
+                        <Text style={{ fontSize: 16, fontWeight: '600', color: '#191c1e' }}>Start Date</Text>
                         <TouchableOpacity onPress={() => setShowNewSubtaskDatePicker(false)}>
                           <Text style={{ color: '#006a66', fontSize: 16, fontWeight: '600' }}>Done</Text>
                         </TouchableOpacity>
                       </View>
                       <DateTimePicker
-                        value={newSubtaskDueDate ? new Date(newSubtaskDueDate) : new Date()}
+                        value={newSubtaskStartDate ? new Date(newSubtaskStartDate) : new Date()}
                         mode="date"
                         display="inline"
                         minimumDate={new Date()}
                         onChange={(_e: DateTimePickerEvent, selected?: Date) => {
                           if (selected) {
                             const ymd = `${selected.getFullYear()}-${String(selected.getMonth() + 1).padStart(2, '0')}-${String(selected.getDate()).padStart(2, '0')}`
-                            setNewSubtaskDueDate(ymd)
+                            setNewSubtaskStartDate(ymd)
                           }
                         }}
                         style={{ alignSelf: 'center' }}
@@ -1214,22 +1214,22 @@ function SubtaskRow({ subtask, settingStatus, reassigningOwner, notesCount, expa
               : <Text style={styles.subtaskOwnerEmpty}>+ assign owner</Text>}
         </TouchableOpacity>
 
-        {/* Meta chips: due date / estimate / completed */}
-        {(subtask.dueDate || subtask.estimatedMinutes || (subtask.completedAt && subtask.status === 'DONE')) && (
+        {/* Meta chips: start date / estimate / completed */}
+        {(subtask.startDate || subtask.estimatedMinutes || (subtask.completedAt && subtask.status === 'DONE')) && (
           <View style={styles.subtaskMetaRow}>
-            {subtask.dueDate && (
+            {subtask.startDate && (
               <View style={[
                 styles.subtaskChip,
-                isSubtaskOverdue(subtask.dueDate) && subtask.status !== 'DONE'
+                isSubtaskOverdue(subtask.startDate) && subtask.status !== 'DONE'
                   ? { backgroundColor: '#ffdad6' }
                   : { backgroundColor: '#e0f2f1' },
               ]}>
                 <Text style={[
                   styles.subtaskChipText,
-                  isSubtaskOverdue(subtask.dueDate) && subtask.status !== 'DONE'
+                  isSubtaskOverdue(subtask.startDate) && subtask.status !== 'DONE'
                     ? { color: '#ba1a1a' }
                     : { color: '#006a66' },
-                ]}>📅 {formatSubtaskDate(subtask.dueDate)}</Text>
+                ]}>📅 {formatSubtaskDate(subtask.startDate)}</Text>
               </View>
             )}
             {subtask.estimatedMinutes != null && subtask.estimatedMinutes > 0 && (
