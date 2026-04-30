@@ -45,6 +45,7 @@ export interface Subtask {
   statusChangedAt?: string | null
   completedAt?: string | null
   startDate?: string | null              // ISO yyyy-MM-dd
+  endDate?: string | null                // ISO yyyy-MM-dd
   estimatedMinutes?: number | null
 }
 

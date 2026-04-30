@@ -111,12 +111,15 @@ export default function SubtaskDetailSheet({
   const [savingStatus, setSavingStatus] = useState(false)
   const [savingOwner, setSavingOwner] = useState(false)
   const [savingStart, setSavingStart] = useState(false)
+  const [savingEnd, setSavingEnd] = useState(false)
   const [savingEstimate, setSavingEstimate] = useState(false)
 
   const [showStatusPicker, setShowStatusPicker] = useState(false)
   const [showOwnerPicker, setShowOwnerPicker] = useState(false)
   const [startInput, setStartInput] = useState('')
   const [editingStart, setEditingStart] = useState(false)
+  const [endInput, setEndInput] = useState('')
+  const [editingEnd, setEditingEnd] = useState(false)
   const [estimateInput, setEstimateInput] = useState('')
   const [editingEstimate, setEditingEstimate] = useState(false)
 
@@ -144,8 +147,10 @@ export default function SubtaskDetailSheet({
     setEditingTitle(false)
     setEditingDesc(false)
     setEditingStart(false)
+    setEditingEnd(false)
     setEditingEstimate(false)
     setStartInput(subtask.startDate ?? '')
+    setEndInput(subtask.endDate ?? '')
     setEstimateInput(subtask.estimatedMinutes != null ? String(subtask.estimatedMinutes / 60) : '')
     setNoteText('')
     setNoteAttachment(null)
@@ -168,7 +173,7 @@ export default function SubtaskDetailSheet({
 
   // ── Save helpers ──────────────────────────────────────────────────────
   const persist = async (
-    patch: { title?: string; ownerId?: number | null; startDate?: string | null; estimatedMinutes?: number | null; description?: string | null | undefined },
+    patch: { title?: string; ownerId?: number | null; startDate?: string | null; endDate?: string | null; estimatedMinutes?: number | null; description?: string | null | undefined },
     setLoading: (v: boolean) => void,
   ) => {
     setLoading(true)
@@ -179,6 +184,7 @@ export default function SubtaskDetailSheet({
         patch.title ?? subtask.title,
         patch.ownerId !== undefined ? patch.ownerId : subtask.ownerId ?? null,
         patch.startDate !== undefined ? patch.startDate : subtask.startDate ?? null,
+        patch.endDate !== undefined ? patch.endDate : subtask.endDate ?? null,
         patch.estimatedMinutes !== undefined ? patch.estimatedMinutes : subtask.estimatedMinutes ?? null,
         patch.description,
       )
@@ -226,6 +232,12 @@ export default function SubtaskDetailSheet({
     const v = startInput.trim()
     await persist({ startDate: v || null }, setSavingStart)
     setEditingStart(false)
+  }
+
+  const saveEnd = async () => {
+    const v = endInput.trim()
+    await persist({ endDate: v || null }, setSavingEnd)
+    setEditingEnd(false)
   }
 
   const saveEstimate = async () => {
@@ -507,6 +519,74 @@ export default function SubtaskDetailSheet({
                             onPress={() => { setStartInput(''); setEditingStart(false); persist({ startDate: null }, setSavingStart) }}
                           >
                             <Text style={{ color: C.danger, fontSize: 14, fontWeight: '600' }}>Clear start date</Text>
+                          </TouchableOpacity>
+                        ) : null}
+                      </View>
+                    </Modal>
+                  )}
+                </View>
+
+                {/* End date */}
+                <View>
+                  <Text style={styles.label}>End date</Text>
+                  <TouchableOpacity
+                    style={styles.fieldRow}
+                    onPress={() => isAdmin && setEditingEnd(true)}
+                    disabled={!isAdmin || savingEnd}
+                  >
+                    <Text style={[styles.fieldValue, !subtask.endDate && { color: C.faint }]}>
+                      {subtask.endDate ? formatDate(subtask.endDate) : 'Not set'}
+                    </Text>
+                    {savingEnd
+                      ? <ActivityIndicator size="small" color={C.primary} />
+                      : isAdmin && <Text style={styles.chevron}>›</Text>}
+                  </TouchableOpacity>
+                  {editingEnd && isAdmin && Platform.OS === 'android' && (
+                    <DateTimePicker
+                      value={endInput ? new Date(endInput) : new Date()}
+                      mode="date"
+                      display="calendar"
+                      onChange={(event: DateTimePickerEvent, selected?: Date) => {
+                        setEditingEnd(false)
+                        if (event.type === 'set' && selected) {
+                          const ymd = `${selected.getFullYear()}-${String(selected.getMonth() + 1).padStart(2, '0')}-${String(selected.getDate()).padStart(2, '0')}`
+                          setEndInput(ymd)
+                          persist({ endDate: ymd }, setSavingEnd)
+                        }
+                      }}
+                    />
+                  )}
+                  {editingEnd && isAdmin && Platform.OS === 'ios' && (
+                    <Modal visible transparent animationType="slide" onRequestClose={() => setEditingEnd(false)}>
+                      <TouchableOpacity style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.45)' }} activeOpacity={1} onPress={() => setEditingEnd(false)} />
+                      <View style={{ backgroundColor: '#fff', paddingBottom: 30, borderTopLeftRadius: 20, borderTopRightRadius: 20 }}>
+                        <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: 14, borderBottomWidth: 1, borderColor: C.border }}>
+                          <TouchableOpacity onPress={() => setEditingEnd(false)}>
+                            <Text style={{ color: C.muted, fontSize: 16 }}>Cancel</Text>
+                          </TouchableOpacity>
+                          <Text style={{ fontSize: 16, fontWeight: '600', color: C.text }}>End Date</Text>
+                          <TouchableOpacity onPress={() => { setEditingEnd(false); persist({ endDate: endInput || null }, setSavingEnd) }}>
+                            <Text style={{ color: C.primary, fontSize: 16, fontWeight: '600' }}>Done</Text>
+                          </TouchableOpacity>
+                        </View>
+                        <DateTimePicker
+                          value={endInput ? new Date(endInput) : new Date()}
+                          mode="date"
+                          display="inline"
+                          onChange={(_e: DateTimePickerEvent, selected?: Date) => {
+                            if (selected) {
+                              const ymd = `${selected.getFullYear()}-${String(selected.getMonth() + 1).padStart(2, '0')}-${String(selected.getDate()).padStart(2, '0')}`
+                              setEndInput(ymd)
+                            }
+                          }}
+                          style={{ alignSelf: 'center' }}
+                        />
+                        {endInput ? (
+                          <TouchableOpacity
+                            style={{ alignSelf: 'center', paddingVertical: 10, paddingHorizontal: 20 }}
+                            onPress={() => { setEndInput(''); setEditingEnd(false); persist({ endDate: null }, setSavingEnd) }}
+                          >
+                            <Text style={{ color: C.danger, fontSize: 14, fontWeight: '600' }}>Clear end date</Text>
                           </TouchableOpacity>
                         ) : null}
                       </View>

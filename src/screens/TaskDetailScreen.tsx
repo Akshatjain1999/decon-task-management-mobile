@@ -141,7 +141,9 @@ export default function TaskDetailScreen({ route, navigation }: Props) {
 
   const [newSubtask, setNewSubtask] = useState('')
   const [newSubtaskStartDate, setNewSubtaskStartDate] = useState<string>('')
+  const [newSubtaskEndDate, setNewSubtaskEndDate] = useState<string>('')
   const [showNewSubtaskDatePicker, setShowNewSubtaskDatePicker] = useState(false)
+  const [showNewSubtaskEndDatePicker, setShowNewSubtaskEndDatePicker] = useState(false)
   const [newSubtaskEstimate, setNewSubtaskEstimate] = useState<string>('')
   const [addingSubtask, setAddingSubtask] = useState(false)
   const [newSubtaskOwnerId, setNewSubtaskOwnerId] = useState<number | null>(null)
@@ -453,6 +455,7 @@ export default function TaskDetailScreen({ route, navigation }: Props) {
     setAddingSubtask(true)
     try {
       const startDate = newSubtaskStartDate.trim() || null
+      const endDate = newSubtaskEndDate.trim() || null
       const estimate = newSubtaskEstimate.trim()
         ? (() => {
             const num = parseFloat(newSubtaskEstimate.trim())
@@ -464,12 +467,14 @@ export default function TaskDetailScreen({ route, navigation }: Props) {
         newSubtask.trim(),
         newSubtaskOwnerId,
         startDate,
+        endDate,
         estimate,
       )
       setTask((prev) => prev ? { ...prev, subtasks: [...prev.subtasks, subtask], subtasksTotal: prev.subtasksTotal + 1 } : prev)
       setNewSubtask('')
       setNewSubtaskOwnerId(null)
       setNewSubtaskStartDate('')
+      setNewSubtaskEndDate('')
       setNewSubtaskEstimate('')
     } catch (e: any) {
       showToast(e?.message || 'Failed to add subtask')
@@ -977,7 +982,7 @@ export default function TaskDetailScreen({ route, navigation }: Props) {
                   )}
                 </TouchableOpacity>
 
-                {/* Start date + estimate inputs */}
+                {/* Start date + end date + estimate inputs */}
                 <View style={{ flexDirection: 'row', gap: 6 }}>
                   <TouchableOpacity
                     style={[styles.miniInputBox, { flex: 1.2 }]}
@@ -990,6 +995,21 @@ export default function TaskDetailScreen({ route, navigation }: Props) {
                     </Text>
                     {newSubtaskStartDate.length > 0 && (
                       <TouchableOpacity onPress={(e) => { e.stopPropagation?.(); setNewSubtaskStartDate('') }}>
+                        <Text style={{ color: '#ba1a1a', fontSize: 12 }}>✕</Text>
+                      </TouchableOpacity>
+                    )}
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    style={[styles.miniInputBox, { flex: 1.2 }]}
+                    onPress={() => setShowNewSubtaskEndDatePicker(true)}
+                    activeOpacity={0.7}
+                  >
+                    <Text style={styles.miniInputIcon}>🏁</Text>
+                    <Text style={[styles.miniInput, { color: newSubtaskEndDate ? '#191c1e' : '#aaa' }]}>
+                      {newSubtaskEndDate || 'End date'}
+                    </Text>
+                    {newSubtaskEndDate.length > 0 && (
+                      <TouchableOpacity onPress={(e) => { e.stopPropagation?.(); setNewSubtaskEndDate('') }}>
                         <Text style={{ color: '#ba1a1a', fontSize: 12 }}>✕</Text>
                       </TouchableOpacity>
                     )}
@@ -1059,6 +1079,61 @@ export default function TaskDetailScreen({ route, navigation }: Props) {
                           if (selected) {
                             const ymd = `${selected.getFullYear()}-${String(selected.getMonth() + 1).padStart(2, '0')}-${String(selected.getDate()).padStart(2, '0')}`
                             setNewSubtaskStartDate(ymd)
+                          }
+                        }}
+                        style={{ alignSelf: 'center' }}
+                      />
+                    </View>
+                  </Modal>
+                )}
+
+                {/* End date picker */}
+                {showNewSubtaskEndDatePicker && Platform.OS === 'android' && (
+                  <DateTimePicker
+                    value={newSubtaskEndDate ? new Date(newSubtaskEndDate) : new Date()}
+                    mode="date"
+                    display="calendar"
+                    minimumDate={new Date()}
+                    onChange={(event: DateTimePickerEvent, selected?: Date) => {
+                      setShowNewSubtaskEndDatePicker(false)
+                      if (event.type === 'set' && selected) {
+                        const ymd = `${selected.getFullYear()}-${String(selected.getMonth() + 1).padStart(2, '0')}-${String(selected.getDate()).padStart(2, '0')}`
+                        setNewSubtaskEndDate(ymd)
+                      }
+                    }}
+                  />
+                )}
+                {Platform.OS === 'ios' && (
+                  <Modal
+                    visible={showNewSubtaskEndDatePicker}
+                    animationType="slide"
+                    transparent
+                    onRequestClose={() => setShowNewSubtaskEndDatePicker(false)}
+                  >
+                    <TouchableOpacity
+                      style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.45)' }}
+                      activeOpacity={1}
+                      onPress={() => setShowNewSubtaskEndDatePicker(false)}
+                    />
+                    <View style={{ backgroundColor: '#fff', paddingBottom: 30, borderTopLeftRadius: 20, borderTopRightRadius: 20 }}>
+                      <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: 14, borderBottomWidth: 1, borderColor: '#eceef0' }}>
+                        <TouchableOpacity onPress={() => setShowNewSubtaskEndDatePicker(false)}>
+                          <Text style={{ color: '#737c7f', fontSize: 16 }}>Cancel</Text>
+                        </TouchableOpacity>
+                        <Text style={{ fontSize: 16, fontWeight: '600', color: '#191c1e' }}>End Date</Text>
+                        <TouchableOpacity onPress={() => setShowNewSubtaskEndDatePicker(false)}>
+                          <Text style={{ color: '#006a66', fontSize: 16, fontWeight: '600' }}>Done</Text>
+                        </TouchableOpacity>
+                      </View>
+                      <DateTimePicker
+                        value={newSubtaskEndDate ? new Date(newSubtaskEndDate) : new Date()}
+                        mode="date"
+                        display="inline"
+                        minimumDate={new Date()}
+                        onChange={(_e: DateTimePickerEvent, selected?: Date) => {
+                          if (selected) {
+                            const ymd = `${selected.getFullYear()}-${String(selected.getMonth() + 1).padStart(2, '0')}-${String(selected.getDate()).padStart(2, '0')}`
+                            setNewSubtaskEndDate(ymd)
                           }
                         }}
                         style={{ alignSelf: 'center' }}
@@ -1214,8 +1289,8 @@ function SubtaskRow({ subtask, settingStatus, reassigningOwner, notesCount, expa
               : <Text style={styles.subtaskOwnerEmpty}>+ assign owner</Text>}
         </TouchableOpacity>
 
-        {/* Meta chips: start date / estimate / completed */}
-        {(subtask.startDate || subtask.estimatedMinutes || (subtask.completedAt && subtask.status === 'DONE')) && (
+        {/* Meta chips: start date / end date / estimate / completed */}
+        {(subtask.startDate || subtask.endDate || subtask.estimatedMinutes || (subtask.completedAt && subtask.status === 'DONE')) && (
           <View style={styles.subtaskMetaRow}>
             {subtask.startDate && (
               <View style={[
@@ -1230,6 +1305,21 @@ function SubtaskRow({ subtask, settingStatus, reassigningOwner, notesCount, expa
                     ? { color: '#ba1a1a' }
                     : { color: '#006a66' },
                 ]}>📅 {formatSubtaskDate(subtask.startDate)}</Text>
+              </View>
+            )}
+            {subtask.endDate && (
+              <View style={[
+                styles.subtaskChip,
+                isSubtaskOverdue(subtask.endDate) && subtask.status !== 'DONE'
+                  ? { backgroundColor: '#ffdad6' }
+                  : { backgroundColor: '#e0f2f1' },
+              ]}>
+                <Text style={[
+                  styles.subtaskChipText,
+                  isSubtaskOverdue(subtask.endDate) && subtask.status !== 'DONE'
+                    ? { color: '#ba1a1a' }
+                    : { color: '#006a66' },
+                ]}>🏁 {formatSubtaskDate(subtask.endDate)}</Text>
               </View>
             )}
             {subtask.estimatedMinutes != null && subtask.estimatedMinutes > 0 && (
