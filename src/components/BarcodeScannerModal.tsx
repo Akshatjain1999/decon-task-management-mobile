@@ -12,14 +12,10 @@ import {
   ActivityIndicator,
 } from 'react-native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
-import {
-  Camera,
-  useCameraDevice,
-  useCameraPermission,
-  useCodeScanner,
-  type Code,
-  type CodeScannerFrame,
-} from 'react-native-vision-camera'
+import Constants from 'expo-constants'
+
+// Detect Expo Go — VisionCamera native module is not bundled there
+const IS_EXPO_GO = Constants.appOwnership === 'expo'
 
 // ── Palette ──────────────────────────────────────────────────────────────────
 const C = {
@@ -42,31 +38,116 @@ export interface BarcodeScannerModalProps {
   onCancel: () => void
 }
 
-// ── ROI — fraction of the camera preview ─────────────────────────────────────
-// regionOfInterest uses normalised coords (0–1). iOS uses this natively;
-// Android we debounce + skip; both show the same visual overlay.
+// ── ROI (VisionCamera, normalised 0-1) ────────────────────────────────────────
 const ROI = { x: 0.14, y: 0.225, width: 0.72, height: 0.55 }
 
-// ── ScannerView ───────────────────────────────────────────────────────────────
-function ScannerView({ onCode }: { onCode: (value: string) => void }) {
+// ─────────────────────────────────────────────────────────────────────────────
+// Expo Go scanner — uses expo-camera (works in Expo Go)
+// ─────────────────────────────────────────────────────────────────────────────
+function ExpoGoScannerView({ onCode }: { onCode: (value: string) => void }) {
+  const { CameraView, useCameraPermissions } = require('expo-camera')
+  const [permission, requestPermission] = useCameraPermissions()
+  const lastRef = useRef<string | null>(null)
+
+  useEffect(() => {
+    if (permission && !permission.granted) requestPermission()
+  }, [permission?.granted])
+
+  if (!permission) return <View style={sv.box}><ActivityIndicator color={C.primary} /></View>
+
+  if (!permission.granted) {
+    return (
+      <View style={[sv.box, { justifyContent: 'center', alignItems: 'center', padding: 16 }]}>
+        <Text style={{ color: '#fff', textAlign: 'center', marginBottom: 12 }}>Camera permission required</Text>
+        <TouchableOpacity
+          style={{ backgroundColor: C.primary, paddingHorizontal: 20, paddingVertical: 10, borderRadius: 8 }}
+          onPress={() => requestPermission().then((r: { granted: boolean }) => { if (!r.granted) Linking.openSettings() })}
+        >
+          <Text style={{ color: '#fff', fontWeight: '600' }}>Grant Permission</Text>
+        </TouchableOpacity>
+      </View>
+    )
+  }
+
+  return (
+    <View style={sv.box}>
+      <CameraView
+        style={StyleSheet.absoluteFillObject}
+        facing="back"
+        barcodeScannerSettings={{ barcodeTypes: ['qr', 'code128', 'code39', 'ean13', 'ean8', 'datamatrix', 'code93'] }}
+        onBarcodeScanned={({ data }: { data: string }) => {
+          const value = data?.trim()
+          if (!value) return
+          if (lastRef.current === value) return
+          lastRef.current = value
+          setTimeout(() => { lastRef.current = null }, 1500)
+          onCode(value)
+        }}
+      />
+      {/* Visual ROI overlay */}
+      <View style={sv.maskTop} pointerEvents="none" />
+      <View style={sv.maskBottom} pointerEvents="none" />
+      <View style={sv.maskLeft} pointerEvents="none" />
+      <View style={sv.maskRight} pointerEvents="none" />
+      <View style={sv.viewfinder} pointerEvents="none">
+        <View style={[sv.corner, sv.cornerTL]} />
+        <View style={[sv.corner, sv.cornerTR]} />
+        <View style={[sv.corner, sv.cornerBL]} />
+        <View style={[sv.corner, sv.cornerBR]} />
+      </View>
+      <Text style={sv.hint}>Align barcode within the frame</Text>
+    </View>
+  )
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Dev/Production scanner — uses react-native-vision-camera (dev build)
+// ─────────────────────────────────────────────────────────────────────────────
+function VisionCameraScannerView({ onCode }: { onCode: (value: string) => void }) {
+  const {
+    Camera,
+    useCameraDevice,
+    useCameraPermission,
+    useCodeScanner,
+  } = require('react-native-vision-camera')
+
   const device = useCameraDevice('back')
-  const lastScannedRef = useRef<string | null>(null)
+  const { hasPermission, requestPermission } = useCameraPermission()
+  const lastRef = useRef<string | null>(null)
+
+  useEffect(() => {
+    if (!hasPermission) requestPermission()
+  }, [hasPermission])
 
   const codeScanner = useCodeScanner({
     codeTypes: ['qr', 'code-128', 'code-39', 'ean-13', 'ean-8', 'data-matrix', 'code-93'],
     regionOfInterest: ROI,
-    onCodeScanned: (codes: Code[], _frame: CodeScannerFrame) => {
+    onCodeScanned: (codes: Array<{ value?: string }>) => {
       for (const code of codes) {
         const value = code.value?.trim()
         if (!value) continue
-        if (lastScannedRef.current === value) continue
-        lastScannedRef.current = value
-        setTimeout(() => { lastScannedRef.current = null }, 1500)
+        if (lastRef.current === value) continue
+        lastRef.current = value
+        setTimeout(() => { lastRef.current = null }, 1500)
         onCode(value)
         break
       }
     },
   })
+
+  if (!hasPermission) {
+    return (
+      <View style={[sv.box, { justifyContent: 'center', alignItems: 'center', padding: 16 }]}>
+        <Text style={{ color: '#fff', textAlign: 'center', marginBottom: 12 }}>Camera permission required</Text>
+        <TouchableOpacity
+          style={{ backgroundColor: C.primary, paddingHorizontal: 20, paddingVertical: 10, borderRadius: 8 }}
+          onPress={() => requestPermission().then((granted: boolean) => { if (!granted) Linking.openSettings() })}
+        >
+          <Text style={{ color: '#fff', fontWeight: '600' }}>Grant Permission</Text>
+        </TouchableOpacity>
+      </View>
+    )
+  }
 
   if (!device) {
     return (
@@ -85,12 +166,10 @@ function ScannerView({ onCode }: { onCode: (value: string) => void }) {
         isActive
         codeScanner={codeScanner}
       />
-      {/* Semi-transparent masks around the ROI */}
       <View style={sv.maskTop} pointerEvents="none" />
       <View style={sv.maskBottom} pointerEvents="none" />
       <View style={sv.maskLeft} pointerEvents="none" />
       <View style={sv.maskRight} pointerEvents="none" />
-      {/* Corner accent frame */}
       <View style={sv.viewfinder} pointerEvents="none">
         <View style={[sv.corner, sv.cornerTL]} />
         <View style={[sv.corner, sv.cornerTR]} />
@@ -102,19 +181,29 @@ function ScannerView({ onCode }: { onCode: (value: string) => void }) {
   )
 }
 
+// ─────────────────────────────────────────────────────────────────────────────
+// Shared ScannerView dispatcher
+// ─────────────────────────────────────────────────────────────────────────────
+function ScannerView({ onCode }: { onCode: (value: string) => void }) {
+  return IS_EXPO_GO
+    ? <ExpoGoScannerView onCode={onCode} />
+    : <VisionCameraScannerView onCode={onCode} />
+}
+
+// ── Shared StyleSheet for scanner views ──────────────────────────────────────
 const pct = (n: number) => `${n * 100}%` as `${number}%`
 const sv = StyleSheet.create({
   box: { height: 260, backgroundColor: '#000', overflow: 'hidden', position: 'relative' },
-  maskTop: { position: 'absolute', top: 0, left: 0, right: 0, height: pct(ROI.y), backgroundColor: 'rgba(0,0,0,0.6)' },
+  maskTop:    { position: 'absolute', top: 0, left: 0, right: 0, height: pct(ROI.y), backgroundColor: 'rgba(0,0,0,0.6)' },
   maskBottom: { position: 'absolute', bottom: 0, left: 0, right: 0, height: pct(ROI.y), backgroundColor: 'rgba(0,0,0,0.6)' },
-  maskLeft: { position: 'absolute', top: pct(ROI.y), bottom: pct(ROI.y), left: 0, width: pct(ROI.x), backgroundColor: 'rgba(0,0,0,0.6)' },
-  maskRight: { position: 'absolute', top: pct(ROI.y), bottom: pct(ROI.y), right: 0, width: pct(ROI.x), backgroundColor: 'rgba(0,0,0,0.6)' },
+  maskLeft:   { position: 'absolute', top: pct(ROI.y), bottom: pct(ROI.y), left: 0, width: pct(ROI.x), backgroundColor: 'rgba(0,0,0,0.6)' },
+  maskRight:  { position: 'absolute', top: pct(ROI.y), bottom: pct(ROI.y), right: 0, width: pct(ROI.x), backgroundColor: 'rgba(0,0,0,0.6)' },
   viewfinder: { position: 'absolute', top: pct(ROI.y), left: pct(ROI.x), width: pct(ROI.width), height: pct(ROI.height), borderRadius: 6 },
-  corner: { position: 'absolute', width: 22, height: 22, borderColor: C.primary, borderRadius: 3 },
-  cornerTL: { top: 0, left: 0, borderTopWidth: 3, borderLeftWidth: 3 },
-  cornerTR: { top: 0, right: 0, borderTopWidth: 3, borderRightWidth: 3 },
-  cornerBL: { bottom: 0, left: 0, borderBottomWidth: 3, borderLeftWidth: 3 },
-  cornerBR: { bottom: 0, right: 0, borderBottomWidth: 3, borderRightWidth: 3 },
+  corner:     { position: 'absolute', width: 22, height: 22, borderColor: C.primary, borderRadius: 3 },
+  cornerTL:   { top: 0,    left: 0,  borderTopWidth: 3,    borderLeftWidth: 3  },
+  cornerTR:   { top: 0,    right: 0, borderTopWidth: 3,    borderRightWidth: 3 },
+  cornerBL:   { bottom: 0, left: 0,  borderBottomWidth: 3, borderLeftWidth: 3  },
+  cornerBR:   { bottom: 0, right: 0, borderBottomWidth: 3, borderRightWidth: 3 },
   hint: { position: 'absolute', bottom: pct(ROI.y + 0.04), alignSelf: 'center', color: 'rgba(255,255,255,0.8)', fontSize: 11, backgroundColor: 'rgba(0,0,0,0.35)', paddingHorizontal: 10, paddingVertical: 3, borderRadius: 20 },
 })
 
@@ -122,7 +211,6 @@ const sv = StyleSheet.create({
 export default function BarcodeScannerModal({
   visible, itemName, allowManual = false, loading = false, onConfirm, onCancel,
 }: BarcodeScannerModalProps) {
-  const { hasPermission, requestPermission } = useCameraPermission()
   const insets = useSafeAreaInsets()
   const [scanned, setScanned] = useState<string[]>([])
   const [manualInput, setManualInput] = useState('')
@@ -131,7 +219,6 @@ export default function BarcodeScannerModal({
     if (!visible) return
     setScanned([])
     setManualInput('')
-    if (!hasPermission) requestPermission()
   }, [visible])
 
   const handleCode = useCallback((value: string) => {
@@ -154,29 +241,6 @@ export default function BarcodeScannerModal({
 
   if (!visible) return null
 
-  const cardPadding = { paddingBottom: Math.max(32, insets.bottom + 20) }
-
-  // ── Permission gate ────────────────────────────────────────────────────────
-  if (!hasPermission) {
-    return (
-      <Modal visible transparent animationType="slide">
-        <View style={styles.overlay}>
-          <View style={[styles.card, cardPadding]}>
-            <Text style={styles.title}>Camera access required</Text>
-            <Text style={[styles.sub, { marginBottom: 20 }]}>Barcode scanning requires camera access.</Text>
-            <TouchableOpacity style={styles.btnPrimary} onPress={() => requestPermission().then(granted => { if (!granted) Linking.openSettings() })}>
-              <Text style={styles.btnPrimaryText}>Grant Permission</Text>
-            </TouchableOpacity>
-            <TouchableOpacity style={[styles.btnGhost, { marginTop: 10 }]} onPress={onCancel}>
-              <Text style={styles.btnGhostText}>Cancel</Text>
-            </TouchableOpacity>
-          </View>
-        </View>
-      </Modal>
-    )
-  }
-
-  // ── Main scanner UI ────────────────────────────────────────────────────────
   return (
     <Modal visible transparent animationType="slide">
       <View style={styles.overlay}>
@@ -184,7 +248,7 @@ export default function BarcodeScannerModal({
           <View style={styles.header}>
             <View style={{ flex: 1 }}>
               <Text style={styles.title} numberOfLines={1}>Stock In — {itemName}</Text>
-              <Text style={styles.sub}>Scanned: {scanned.length}</Text>
+              <Text style={styles.sub}>Scanned: {scanned.length}{IS_EXPO_GO ? ' (Expo Go mode)' : ''}</Text>
             </View>
             <TouchableOpacity onPress={onCancel} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
               <Text style={styles.closeBtn}>✕</Text>
@@ -232,27 +296,26 @@ export default function BarcodeScannerModal({
 }
 
 const styles = StyleSheet.create({
-  overlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.6)', justifyContent: 'flex-end' },
-  card: { backgroundColor: '#fff', borderTopLeftRadius: 16, borderTopRightRadius: 16, padding: 24 },
-  fullCard: { backgroundColor: '#fff', borderTopLeftRadius: 16, borderTopRightRadius: 16, height: '92%' },
-  header: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, paddingTop: 16, paddingBottom: 8, borderBottomWidth: 1, borderBottomColor: C.border },
-  title: { fontSize: 16, fontWeight: '700', color: C.text },
-  sub: { fontSize: 12, color: C.muted, marginTop: 2 },
-  closeBtn: { fontSize: 18, color: C.muted, paddingLeft: 8 },
+  overlay:   { flex: 1, backgroundColor: 'rgba(0,0,0,0.6)', justifyContent: 'flex-end' },
+  fullCard:  { backgroundColor: '#fff', borderTopLeftRadius: 16, borderTopRightRadius: 16, height: '92%' },
+  header:    { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, paddingTop: 16, paddingBottom: 8, borderBottomWidth: 1, borderBottomColor: C.border },
+  title:     { fontSize: 16, fontWeight: '700', color: C.text },
+  sub:       { fontSize: 12, color: C.muted, marginTop: 2 },
+  closeBtn:  { fontSize: 18, color: C.muted, paddingLeft: 8 },
   manualRow: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 12, paddingVertical: 8, borderBottomWidth: 1, borderBottomColor: C.border, gap: 8 },
   manualInput: { flex: 1, height: 40, borderWidth: 1, borderColor: C.border, borderRadius: 8, paddingHorizontal: 12, fontSize: 14, color: C.text },
-  addBtn: { backgroundColor: C.primarySoft, paddingHorizontal: 16, height: 40, borderRadius: 8, justifyContent: 'center', alignItems: 'center' },
+  addBtn:    { backgroundColor: C.primarySoft, paddingHorizontal: 16, height: 40, borderRadius: 8, justifyContent: 'center', alignItems: 'center' },
   addBtnText: { color: C.primary, fontWeight: '600', fontSize: 14 },
-  list: { flex: 1, paddingHorizontal: 12, paddingTop: 8 },
+  list:      { flex: 1, paddingHorizontal: 12, paddingTop: 8 },
   emptyText: { textAlign: 'center', color: C.muted, fontSize: 13, marginTop: 16 },
   serialRow: { flexDirection: 'row', alignItems: 'center', paddingVertical: 8, borderBottomWidth: 1, borderBottomColor: C.bg, gap: 6 },
   serialIndex: { fontSize: 12, color: C.muted, width: 22, textAlign: 'right' },
-  serialText: { flex: 1, fontSize: 14, color: C.text, fontFamily: 'monospace' },
-  removeBtn: { fontSize: 14, color: C.danger, paddingHorizontal: 4 },
-  footer: { flexDirection: 'row', gap: 10, paddingHorizontal: 12, paddingTop: 8 },
-  btnPrimary: { flex: 1, backgroundColor: C.primary, borderRadius: 10, height: 44, justifyContent: 'center', alignItems: 'center' },
+  serialText:  { flex: 1, fontSize: 14, color: C.text, fontFamily: 'monospace' },
+  removeBtn:   { fontSize: 14, color: C.danger, paddingHorizontal: 4 },
+  footer:    { flexDirection: 'row', gap: 10, paddingHorizontal: 12, paddingTop: 8 },
+  btnPrimary:     { flex: 1, backgroundColor: C.primary, borderRadius: 10, height: 44, justifyContent: 'center', alignItems: 'center' },
   btnPrimaryText: { color: '#fff', fontWeight: '700', fontSize: 15 },
-  btnGhost: { flex: 1, borderRadius: 10, borderWidth: 1, borderColor: C.border, height: 44, justifyContent: 'center', alignItems: 'center' },
-  btnGhostText: { color: C.text, fontSize: 15 },
-  btnDisabled: { opacity: 0.6 },
+  btnGhost:       { flex: 1, borderRadius: 10, borderWidth: 1, borderColor: C.border, height: 44, justifyContent: 'center', alignItems: 'center' },
+  btnGhostText:   { color: C.text, fontSize: 15 },
+  btnDisabled:    { opacity: 0.6 },
 })
