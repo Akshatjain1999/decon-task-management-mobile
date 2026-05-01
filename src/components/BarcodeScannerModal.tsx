@@ -39,7 +39,12 @@ export interface BarcodeScannerModalProps {
 }
 
 // ── ROI (VisionCamera, normalised 0-1) ────────────────────────────────────────
-const ROI = { x: 0.14, y: 0.225, width: 0.72, height: 0.55 }
+// ROI_TOP / ROI_BOTTOM are independent so the window can be asymmetric
+const ROI_TOP    = 0.38   // larger top mask → window starts lower
+const ROI_BOTTOM = 0.225
+const ROI_X      = 0.14
+const ROI_W      = 0.72
+const ROI = { x: ROI_X, y: ROI_TOP, width: ROI_W, height: 1 - ROI_TOP - ROI_BOTTOM }
 
 // ── AIM identifier stripper ───────────────────────────────────────────────────
 // Many barcode decoders prefix the raw value with a ]XX AIM identifier, e.g.
@@ -215,17 +220,17 @@ function ScannerView({ onCode }: { onCode: (value: string) => void }) {
 const pct = (n: number) => `${n * 100}%` as `${number}%`
 const sv = StyleSheet.create({
   box: { height: 260, backgroundColor: '#000', overflow: 'hidden', position: 'relative' },
-  maskTop:    { position: 'absolute', top: 0, left: 0, right: 0, height: pct(ROI.y), backgroundColor: 'rgba(0,0,0,0.6)' },
-  maskBottom: { position: 'absolute', bottom: 0, left: 0, right: 0, height: pct(ROI.y), backgroundColor: 'rgba(0,0,0,0.6)' },
-  maskLeft:   { position: 'absolute', top: pct(ROI.y), bottom: pct(ROI.y), left: 0, width: pct(ROI.x), backgroundColor: 'rgba(0,0,0,0.6)' },
-  maskRight:  { position: 'absolute', top: pct(ROI.y), bottom: pct(ROI.y), right: 0, width: pct(ROI.x), backgroundColor: 'rgba(0,0,0,0.6)' },
-  viewfinder: { position: 'absolute', top: pct(ROI.y), left: pct(ROI.x), width: pct(ROI.width), height: pct(ROI.height), borderRadius: 6 },
+  maskTop:    { position: 'absolute', top: 0, left: 0, right: 0, height: pct(ROI_TOP), backgroundColor: 'rgba(0,0,0,0.6)' },
+  maskBottom: { position: 'absolute', bottom: 0, left: 0, right: 0, height: pct(ROI_BOTTOM), backgroundColor: 'rgba(0,0,0,0.6)' },
+  maskLeft:   { position: 'absolute', top: pct(ROI_TOP), bottom: pct(ROI_BOTTOM), left: 0, width: pct(ROI.x), backgroundColor: 'rgba(0,0,0,0.6)' },
+  maskRight:  { position: 'absolute', top: pct(ROI_TOP), bottom: pct(ROI_BOTTOM), right: 0, width: pct(ROI.x), backgroundColor: 'rgba(0,0,0,0.6)' },
+  viewfinder: { position: 'absolute', top: pct(ROI_TOP), left: pct(ROI.x), width: pct(ROI.width), height: pct(ROI.height), borderRadius: 6 },
   corner:     { position: 'absolute', width: 22, height: 22, borderColor: C.primary, borderRadius: 3 },
   cornerTL:   { top: 0,    left: 0,  borderTopWidth: 3,    borderLeftWidth: 3  },
   cornerTR:   { top: 0,    right: 0, borderTopWidth: 3,    borderRightWidth: 3 },
   cornerBL:   { bottom: 0, left: 0,  borderBottomWidth: 3, borderLeftWidth: 3  },
   cornerBR:   { bottom: 0, right: 0, borderBottomWidth: 3, borderRightWidth: 3 },
-  hint: { position: 'absolute', bottom: pct(ROI.y + 0.04), alignSelf: 'center', color: 'rgba(255,255,255,0.8)', fontSize: 11, backgroundColor: 'rgba(0,0,0,0.35)', paddingHorizontal: 10, paddingVertical: 3, borderRadius: 20 },
+  hint: { position: 'absolute', bottom: pct(ROI_BOTTOM + 0.04), alignSelf: 'center', color: 'rgba(255,255,255,0.8)', fontSize: 11, backgroundColor: 'rgba(0,0,0,0.35)', paddingHorizontal: 10, paddingVertical: 3, borderRadius: 20 },
 })
 
 // ── Main component ────────────────────────────────────────────────────────────
