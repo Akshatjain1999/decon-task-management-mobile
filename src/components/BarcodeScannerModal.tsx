@@ -48,15 +48,15 @@ const ROI = { x: 0.14, y: 0.225, width: 0.72, height: 0.55 }
 //   ]Q0  → QR code
 //   ]d2  → Data Matrix
 // These are decoder meta-data, not part of the actual barcode content.
-const SERIAL_LEN = 6
-// Allow letters and digits only (no hyphens/dots — serials are plain alphanumeric)
+const MIN_BARCODE_LEN = 4
+// Allow letters and digits only — no spaces, commas, semicolons, or other noise chars
 const VALID_BARCODE_RE = /^[A-Za-z0-9]+$/
 
 function normalizeBarcode(raw: string): string {
   // Strip leading ]<letter><digit(s)> AIM prefix if present
   const stripped = raw.replace(/^\][A-Za-z]\d+/, '').trim()
-  // Reject if not exactly the expected serial length
-  if (stripped.length !== SERIAL_LEN) return ''
+  // Reject very short reads (likely noise)
+  if (stripped.length < MIN_BARCODE_LEN) return ''
   // Reject if contains anything other than letters and digits
   if (!VALID_BARCODE_RE.test(stripped)) return ''
   return stripped
