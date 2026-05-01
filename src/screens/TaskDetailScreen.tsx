@@ -28,10 +28,11 @@ import { useAppDispatch, useAppSelector } from '../store/hooks'
 import { updateTask, fetchTasks } from '../store/taskSlice'
 import type { Task, TaskStatus, Comment, TaskAuditsResponse, Subtask, SubtaskNote, SubtaskStatus, User } from '../types'
 import SubtaskDetailSheet from '../components/SubtaskDetailSheet'
+import InventorySection from '../components/InventorySection'
 import DateTimePicker, { type DateTimePickerEvent } from '@react-native-community/datetimepicker'
 
 type Props = NativeStackScreenProps<RootStackParamList, 'TaskDetail'>
-type Tab = 'details' | 'subtasks' | 'comments' | 'activity'
+type Tab = 'details' | 'subtasks' | 'comments' | 'activity' | 'inventory'
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 const STATUS_BADGE: Record<TaskStatus, { bg: string; text: string }> = {
@@ -857,7 +858,7 @@ export default function TaskDetailScreen({ route, navigation }: Props) {
 
         {/* ── Tabs ────────────────────────────────────────────────────── */}
         <View style={styles.tabBar}>
-          {(['details', 'subtasks', 'comments', 'activity'] as Tab[]).map((tab) => (
+          {(['details', 'subtasks', 'comments', 'activity', 'inventory'] as Tab[]).map((tab) => (
             <TouchableOpacity
               key={tab}
               style={[styles.tab, activeTab === tab && styles.tabActive]}
@@ -867,6 +868,7 @@ export default function TaskDetailScreen({ route, navigation }: Props) {
                 {tab === 'details' ? 'Details'
                   : tab === 'subtasks' ? `Subtasks${task.subtasksTotal > 0 ? ` (${task.subtasksCompleted}/${task.subtasksTotal})` : ''}`
                   : tab === 'comments' ? `Comments${task.commentsCount > 0 ? ` (${task.commentsCount})` : ''}`
+                  : tab === 'inventory' ? 'Inventory'
                   : 'Activity'}
               </Text>
             </TouchableOpacity>
@@ -1224,6 +1226,11 @@ export default function TaskDetailScreen({ route, navigation }: Props) {
                 </>
               )}
             </View>
+          )}
+
+          {/* INVENTORY TAB */}
+          {activeTab === 'inventory' && (
+            <InventorySection taskId={task.id} isAdmin={isAdmin} />
           )}
         </ScrollView>
       </KeyboardAvoidingView>

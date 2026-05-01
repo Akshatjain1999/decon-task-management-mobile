@@ -301,3 +301,40 @@ export interface MySubtaskListItem {
   taskType: string | null
   taskPriority: string | null
 }
+
+// ─── Inventory ─────────────────────────────────────────────────────────────
+export type InventoryCategory = 'CAMERA' | 'NVR_STORAGE' | 'RACK' | 'NETWORK' | 'DISPLAY' | 'CABLE' | 'ACCESSORIES'
+export type MovementType = 'STOCK_IN' | 'DISPATCH' | 'DELIVERY' | 'RETURN' | 'ADJUSTMENT'
+export type DispatchStatus = 'PENDING' | 'PARTIALLY_DISPATCHED' | 'DISPATCHED' | 'DELIVERED'
+
+export interface TaskInventoryItem {
+  id: number
+  inventoryItemId: number
+  itemName: string
+  unit: string
+  category: InventoryCategory
+  quantityRequired: number
+  quantityDispatched: number
+  quantityDelivered: number
+  notes: string | null
+  status: DispatchStatus
+}
+
+export interface InventoryMovement {
+  id: number
+  inventoryItemId: number
+  itemName: string
+  movementType: MovementType
+  quantity: number
+  stockBefore: number
+  stockAfter: number
+  movementDate: string
+  performedByName: string
+  notes: string | null
+}
+
+export interface RecordMovementRequest {
+  quantity: number
+  notes?: string
+  movementDate: string
+}
