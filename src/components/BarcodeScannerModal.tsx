@@ -246,12 +246,17 @@ export default function BarcodeScannerModal({
       <View style={styles.overlay}>
         <View style={styles.fullCard}>
           <View style={styles.header}>
-            <View style={{ flex: 1 }}>
-              <Text style={styles.title} numberOfLines={1}>Stock In — {itemName}</Text>
-              <Text style={styles.sub}>Scanned: {scanned.length}{IS_EXPO_GO ? ' (Expo Go mode)' : ''}</Text>
+            <View style={{ flex: 1, marginRight: 12 }}>
+              <Text style={styles.headerLabel}>STOCK IN</Text>
+              <Text style={styles.title} numberOfLines={2}>{itemName}</Text>
+              {scanned.length > 0 && (
+                <View style={styles.countBadge}>
+                  <Text style={styles.countBadgeText}>{scanned.length} scanned</Text>
+                </View>
+              )}
             </View>
-            <TouchableOpacity onPress={onCancel} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
-              <Text style={styles.closeBtn}>✕</Text>
+            <TouchableOpacity style={styles.closeCircle} onPress={onCancel} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+              <Text style={styles.closeIcon}>✕</Text>
             </TouchableOpacity>
           </View>
 
@@ -298,10 +303,13 @@ export default function BarcodeScannerModal({
 const styles = StyleSheet.create({
   overlay:   { flex: 1, backgroundColor: 'rgba(0,0,0,0.6)', justifyContent: 'flex-end' },
   fullCard:  { backgroundColor: '#fff', borderTopLeftRadius: 16, borderTopRightRadius: 16, height: '92%' },
-  header:    { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, paddingTop: 16, paddingBottom: 8, borderBottomWidth: 1, borderBottomColor: C.border },
-  title:     { fontSize: 16, fontWeight: '700', color: C.text },
-  sub:       { fontSize: 12, color: C.muted, marginTop: 2 },
-  closeBtn:  { fontSize: 18, color: C.muted, paddingLeft: 8 },
+  header:       { flexDirection: 'row', alignItems: 'flex-start', paddingHorizontal: 16, paddingTop: 16, paddingBottom: 12, borderBottomWidth: 1, borderBottomColor: C.border },
+  headerLabel:  { fontSize: 10, fontWeight: '700', letterSpacing: 1.2, color: C.primary, textTransform: 'uppercase', marginBottom: 2 },
+  title:        { fontSize: 15, fontWeight: '700', color: C.text, lineHeight: 21 },
+  countBadge:   { alignSelf: 'flex-start', marginTop: 6, backgroundColor: C.primarySoft, borderRadius: 12, paddingHorizontal: 10, paddingVertical: 3 },
+  countBadgeText: { fontSize: 12, fontWeight: '600', color: C.primary },
+  closeCircle:  { width: 32, height: 32, borderRadius: 16, backgroundColor: C.bg, justifyContent: 'center', alignItems: 'center', marginTop: 2 },
+  closeIcon:    { fontSize: 14, color: C.muted, lineHeight: 16 },
   manualRow: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 12, paddingVertical: 8, borderBottomWidth: 1, borderBottomColor: C.border, gap: 8 },
   manualInput: { flex: 1, height: 40, borderWidth: 1, borderColor: C.border, borderRadius: 8, paddingHorizontal: 12, fontSize: 14, color: C.text },
   addBtn:    { backgroundColor: C.primarySoft, paddingHorizontal: 16, height: 40, borderRadius: 8, justifyContent: 'center', alignItems: 'center' },
