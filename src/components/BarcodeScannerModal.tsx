@@ -1,5 +1,6 @@
-import React, { useState, useRef } from 'react'
+import React, { useState, useRef, useEffect } from 'react'
 import {
+  AppState,
   Modal,
   View,
   Text,
@@ -10,7 +11,8 @@ import {
   Alert,
   ActivityIndicator,
 } from 'react-native'
-import { Camera, CameraView, type BarcodeScanningResult } from 'expo-camera'
+import { useSafeAreaInsets } from 'react-native-safe-area-context'
+import { CameraView, useCameraPermissions, type BarcodeScanningResult } from 'expo-camera'
 
 // ── Palette ──────────────────────────────────────────────────────────────────
 const C = {
@@ -46,24 +48,30 @@ export default function BarcodeScannerModal({
   onConfirm,
   onCancel,
 }: BarcodeScannerModalProps) {
-  const [hasPermission, setHasPermission] = useState<boolean | null>(null)
+  const [permission, requestPermission] = useCameraPermissions()
+  const insets = useSafeAreaInsets()
   const [scanned, setScanned] = useState<string[]>([])
   const [manualInput, setManualInput] = useState('')
   const lastScannedRef = useRef<string | null>(null)
 
-  // Check permission and reset state whenever modal opens
-  React.useEffect(() => {
+  // Reset state when modal opens
+  useEffect(() => {
     if (!visible) return
     setScanned([])
     setManualInput('')
     lastScannedRef.current = null
-    Camera.getCameraPermissionsAsync().then(({ granted }) => setHasPermission(granted))
   }, [visible])
 
-  async function requestPermission() {
-    const { granted } = await Camera.requestCameraPermissionsAsync()
-    setHasPermission(granted)
-  }
+  // Re-check permission when app returns to foreground (after OS dialog resolves)
+  useEffect(() => {
+    if (!visible) return
+    const sub = AppState.addEventListener('change', state => {
+      if (state === 'active' && permission && !permission.granted) {
+        requestPermission()
+      }
+    })
+    return () => sub.remove()
+  }, [visible, permission])
 
   function handleBarcode(result: BarcodeScanningResult) {
     const value = result.data?.trim()
@@ -106,11 +114,13 @@ export default function BarcodeScannerModal({
   if (!visible) return null
 
   // ── Permission gate ────────────────────────────────────────────────────────
-  if (hasPermission === null) {
+  const cardPadding = { paddingBottom: Math.max(24, insets.bottom + 16) }
+
+  if (!permission) {
     return (
       <Modal visible transparent animationType="slide">
         <View style={styles.overlay}>
-          <View style={styles.card}>
+          <View style={[styles.card, cardPadding]}>
             <ActivityIndicator color={C.primary} />
           </View>
         </View>
@@ -118,19 +128,19 @@ export default function BarcodeScannerModal({
     )
   }
 
-  if (!hasPermission) {
+  if (!permission.granted) {
     return (
       <Modal visible transparent animationType="slide">
         <View style={styles.overlay}>
-          <View style={styles.card}>
+          <View style={[styles.card, cardPadding]}>
             <Text style={styles.title}>Camera permission required</Text>
-            <Text style={[styles.sub, { marginBottom: 16 }]}>
+            <Text style={[styles.sub, { marginBottom: 20 }]}>
               Barcode scanning requires camera access.
             </Text>
             <TouchableOpacity style={styles.btnPrimary} onPress={requestPermission}>
               <Text style={styles.btnPrimaryText}>Grant permission</Text>
             </TouchableOpacity>
-            <TouchableOpacity style={[styles.btnGhost, { marginTop: 8 }]} onPress={onCancel}>
+            <TouchableOpacity style={[styles.btnGhost, { marginTop: 10 }]} onPress={onCancel}>
               <Text style={styles.btnGhostText}>Cancel</Text>
             </TouchableOpacity>
           </View>
