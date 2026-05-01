@@ -49,12 +49,16 @@ const ROI = { x: 0.14, y: 0.225, width: 0.72, height: 0.55 }
 //   ]d2  → Data Matrix
 // These are decoder meta-data, not part of the actual barcode content.
 const MIN_BARCODE_LEN = 4
+// Allow letters, digits, hyphens, underscores, dots, and forward slashes only
+const VALID_BARCODE_RE = /^[A-Za-z0-9\-_.\/]+$/
 
 function normalizeBarcode(raw: string): string {
   // Strip leading ]<letter><digit(s)> AIM prefix if present
   const stripped = raw.replace(/^\][A-Za-z]\d+/, '').trim()
-  // Reject noise / garbage reads that are too short
-  return stripped.length >= MIN_BARCODE_LEN ? stripped : ''
+  // Reject noise / garbage reads that are too short or contain special characters
+  if (stripped.length < MIN_BARCODE_LEN) return ''
+  if (!VALID_BARCODE_RE.test(stripped)) return ''
+  return stripped
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
