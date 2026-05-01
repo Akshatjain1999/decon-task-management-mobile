@@ -30,3 +30,17 @@ export async function updateTaskInventoryItem(
 ): Promise<void> {
   await api.put(`/api/v1/tasks/${taskId}/inventory/${itemId}`, req)
 }
+
+export async function stockIn(
+  itemId: number,
+  req: { quantity: number; notes?: string; movementDate: string },
+): Promise<void> {
+  await api.post(`/api/v1/inventory/catalog/${itemId}/stock-in`, req)
+}
+
+export async function stockInWithSerials(
+  itemId: number,
+  req: { serialNumbers: string[]; notes?: string; movementDate: string },
+): Promise<void> {
+  await api.post(`/api/v1/inventory/catalog/${itemId}/stock-in/serials`, req)
+}

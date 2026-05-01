@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useState } from 'react'
 import {
   ActivityIndicator,
+  Alert,
   Modal,
   ScrollView,
   StyleSheet,
@@ -11,6 +12,7 @@ import {
 } from 'react-native'
 import * as inventoryService from '../services/inventoryService'
 import type { DispatchStatus, InventoryMovement, RecordMovementRequest, TaskInventoryItem } from '../types'
+import BarcodeScannerModal from './BarcodeScannerModal'
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
@@ -41,6 +43,7 @@ const MOV_TYPE_CONFIG: Record<string, { bg: string; text: string }> = {
 interface Props {
   taskId: number
   isAdmin: boolean
+  isSuperAdmin?: boolean
   subtasks?: SimpleSubtask[]
 }
 
@@ -52,7 +55,7 @@ function today(): string {
 
 // ── Component ────────────────────────────────────────────────────────────────
 
-export default function InventorySection({ taskId, isAdmin, subtasks = [] }: Props) {
+export default function InventorySection({ taskId, isAdmin, isSuperAdmin = false, subtasks = [] }: Props) {
   const [items, setItems] = useState<TaskInventoryItem[]>([])
   const [movements, setMovements] = useState<InventoryMovement[]>([])
   const [loading, setLoading] = useState(true)
@@ -69,6 +72,20 @@ export default function InventorySection({ taskId, isAdmin, subtasks = [] }: Pro
   const [movSubtaskId, setMovSubtaskId] = useState<number | null>(null)
   const [movSaving, setMovSaving] = useState(false)
   const [movError, setMovError] = useState<string | null>(null)
+
+  // Stock-in modal (non-serialised)
+  const [siOpen, setSiOpen] = useState(false)
+  const [siItem, setSiItem] = useState<TaskInventoryItem | null>(null)
+  const [siQty, setSiQty] = useState('1')
+  const [siNotes, setSiNotes] = useState('')
+  const [siDate, setSiDate] = useState(today())
+  const [siSaving, setSiSaving] = useState(false)
+  const [siError, setSiError] = useState<string | null>(null)
+
+  // Barcode scanner (serialised)
+  const [barcodeOpen, setBarcodeOpen] = useState(false)
+  const [barcodeItem, setBarcodeItem] = useState<TaskInventoryItem | null>(null)
+  const [barcodeSaving, setBarcodeSaving] = useState(false)
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -98,6 +115,56 @@ export default function InventorySection({ taskId, isAdmin, subtasks = [] }: Pro
     setMovSubtaskId(null)
     setMovError(null)
     setMovOpen(true)
+  }
+
+  function openStockIn(item: TaskInventoryItem) {
+    if (item.serialTracked) {
+      setBarcodeItem(item)
+      setBarcodeOpen(true)
+    } else {
+      setSiItem(item)
+      setSiQty('1')
+      setSiNotes('')
+      setSiDate(today())
+      setSiError(null)
+      setSiOpen(true)
+    }
+  }
+
+  async function submitStockIn() {
+    if (!siItem) return
+    const qty = parseInt(siQty, 10)
+    if (isNaN(qty) || qty < 1) { setSiError('Quantity must be at least 1'); return }
+    setSiSaving(true)
+    setSiError(null)
+    try {
+      await inventoryService.stockIn(siItem.inventoryItemId, { quantity: qty, notes: siNotes || undefined, movementDate: siDate })
+      setSiOpen(false)
+      setSiItem(null)
+      load()
+    } catch (e: any) {
+      setSiError(e?.response?.data?.message || e?.message || 'Something went wrong')
+    } finally {
+      setSiSaving(false)
+    }
+  }
+
+  async function submitBarcodeStockIn(serials: string[]) {
+    if (!barcodeItem) return
+    setBarcodeSaving(true)
+    try {
+      await inventoryService.stockInWithSerials(barcodeItem.inventoryItemId, {
+        serialNumbers: serials,
+        movementDate: today(),
+      })
+      setBarcodeOpen(false)
+      setBarcodeItem(null)
+      load()
+    } catch (e: any) {
+      Alert.alert('Stock-in failed', e?.response?.data?.message || e?.message || 'Something went wrong')
+    } finally {
+      setBarcodeSaving(false)
+    }
   }
 
   async function submitMov() {
@@ -181,6 +248,9 @@ export default function InventorySection({ taskId, isAdmin, subtasks = [] }: Pro
                 </View>
                 {isAdmin && (
                   <View style={s.itemActions}>
+                    <TouchableOpacity style={[s.actionBtn, { borderColor: '#006a66' }]} onPress={() => openStockIn(item)}>
+                      <Text style={[s.actionBtnText, { color: '#006a66' }]}>Stock In</Text>
+                    </TouchableOpacity>
                     <TouchableOpacity style={[s.actionBtn, { borderColor: '#1d4ed8' }]} onPress={() => openMov(item, 'DISPATCH')}>
                       <Text style={[s.actionBtnText, { color: '#1d4ed8' }]}>Dispatch</Text>
                     </TouchableOpacity>
@@ -236,6 +306,47 @@ export default function InventorySection({ taskId, isAdmin, subtasks = [] }: Pro
           })}
         </View>
       )}
+
+      {/* Stock-in Modal (non-serialised) */}
+      <Modal visible={siOpen} transparent animationType="slide" onRequestClose={() => setSiOpen(false)}>
+        <View style={s.modalOverlay}>
+          <View style={s.modalSheet}>
+            <View style={s.modalHeader}>
+              <Text style={s.modalTitle}>Stock In</Text>
+              <TouchableOpacity onPress={() => setSiOpen(false)}>
+                <Text style={s.modalClose}>✕</Text>
+              </TouchableOpacity>
+            </View>
+            {siItem && (
+              <ScrollView style={s.modalBody} keyboardShouldPersistTaps="handled">
+                <Text style={s.modalItemName}>{siItem.itemName}</Text>
+                <Text style={s.fieldLabel}>Quantity *</Text>
+                <TextInput value={siQty} onChangeText={setSiQty} keyboardType="number-pad" style={s.fieldInput} />
+                <Text style={s.fieldLabel}>Date (YYYY-MM-DD)</Text>
+                <TextInput value={siDate} onChangeText={setSiDate} placeholder="2025-01-01" style={s.fieldInput} />
+                <Text style={s.fieldLabel}>Notes</Text>
+                <TextInput value={siNotes} onChangeText={setSiNotes} placeholder="Optional" style={s.fieldInput} />
+                {siError ? <Text style={s.movErrText}>{siError}</Text> : null}
+                <TouchableOpacity style={s.submitBtn} onPress={submitStockIn} disabled={siSaving}>
+                  {siSaving
+                    ? <ActivityIndicator color="#fff" />
+                    : <Text style={s.submitBtnText}>Confirm</Text>}
+                </TouchableOpacity>
+              </ScrollView>
+            )}
+          </View>
+        </View>
+      </Modal>
+
+      {/* Barcode scanner (serialised) */}
+      <BarcodeScannerModal
+        visible={barcodeOpen}
+        itemName={barcodeItem?.itemName ?? ''}
+        allowManual={isSuperAdmin}
+        loading={barcodeSaving}
+        onConfirm={submitBarcodeStockIn}
+        onCancel={() => { setBarcodeOpen(false); setBarcodeItem(null) }}
+      />
 
       {/* Movement Modal */}
       <Modal visible={movOpen} transparent animationType="slide" onRequestClose={() => setMovOpen(false)}>

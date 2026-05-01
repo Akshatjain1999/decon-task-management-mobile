@@ -318,6 +318,7 @@ export interface TaskInventoryItem {
   quantityDelivered: number
   notes: string | null
   status: DispatchStatus
+  serialTracked: boolean
 }
 
 export interface InventoryMovement {

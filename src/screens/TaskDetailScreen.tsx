@@ -1230,7 +1230,7 @@ export default function TaskDetailScreen({ route, navigation }: Props) {
 
           {/* INVENTORY TAB */}
           {activeTab === 'inventory' && (
-            <InventorySection taskId={task.id} isAdmin={(currentUser?.role ?? '').toUpperCase().includes('ADMIN')} subtasks={task.subtasks ?? []} />
+            <InventorySection taskId={task.id} isAdmin={(currentUser?.role ?? '').toUpperCase().includes('ADMIN')} isSuperAdmin={(currentUser?.role ?? '').toUpperCase() === 'SUPER_ADMIN'} subtasks={task.subtasks ?? []} />
           )}
         </ScrollView>
       </KeyboardAvoidingView>
