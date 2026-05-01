@@ -478,11 +478,13 @@ export default function InventoryScreen() {
   const [filterTaskType, setFilterTaskType] = useState<TaskType | ''>('')
   const [filterCategory, setFilterCategory] = useState<InventoryCategory | ''>('')
   const [filterActive, setFilterActive] = useState<'all' | 'active' | 'inactive'>('active')
+  const [filterSerial, setFilterSerial] = useState<'all' | 'serial' | 'non-serial'>('all')
 
   // Filter sheet pickers
   const [showTypeFilter, setShowTypeFilter] = useState(false)
   const [showCatFilter, setShowCatFilter] = useState(false)
   const [showActiveFilter, setShowActiveFilter] = useState(false)
+  const [showSerialFilter, setShowSerialFilter] = useState(false)
 
   // Modals
   const [addEditOpen, setAddEditOpen] = useState(false)
@@ -519,10 +521,12 @@ export default function InventoryScreen() {
       if (filterCategory && item.category !== filterCategory) return false
       if (filterActive === 'active' && !item.isActive) return false
       if (filterActive === 'inactive' && item.isActive) return false
+      if (filterSerial === 'serial' && !item.serialTracked) return false
+      if (filterSerial === 'non-serial' && item.serialTracked) return false
       if (search && !item.name.toLowerCase().includes(search.toLowerCase())) return false
       return true
     })
-  }, [items, filterTaskType, filterCategory, filterActive, search])
+  }, [items, filterTaskType, filterCategory, filterActive, filterSerial, search])
 
   function openStockIn(item: InventoryItem) {
     if (item.serialTracked) {
@@ -626,8 +630,13 @@ export default function InventoryScreen() {
               {filterActive === 'all' ? 'All Status' : filterActive === 'active' ? 'Active' : 'Inactive'}
             </Text>
           </TouchableOpacity>
-          {(filterTaskType || filterCategory || filterActive !== 'all' || search) && (
-            <TouchableOpacity style={s.clearChip} onPress={() => { setFilterTaskType(''); setFilterCategory(''); setFilterActive('all'); setSearch('') }}>
+          <TouchableOpacity style={[s.chip, filterSerial !== 'all' && s.chipActive]} onPress={() => setShowSerialFilter(true)}>
+            <Text style={[s.chipText, filterSerial !== 'all' && s.chipTextActive]}>
+              {filterSerial === 'all' ? 'All Tracking' : filterSerial === 'serial' ? 'Serial Tracked' : 'Non-Serial'}
+            </Text>
+          </TouchableOpacity>
+          {(filterTaskType || filterCategory || filterActive !== 'all' || filterSerial !== 'all' || search) && (
+            <TouchableOpacity style={s.clearChip} onPress={() => { setFilterTaskType(''); setFilterCategory(''); setFilterActive('all'); setFilterSerial('all'); setSearch('') }}>
               <Text style={s.clearChipText}>Clear ✕</Text>
             </TouchableOpacity>
           )}
@@ -676,6 +685,9 @@ export default function InventoryScreen() {
       <SelectSheet visible={showActiveFilter} title="Status"
         options={[{ value: 'all', label: 'All' }, { value: 'active', label: 'Active' }, { value: 'inactive', label: 'Inactive' }]}
         value={filterActive} onSelect={v => setFilterActive(v as 'all' | 'active' | 'inactive')} onClose={() => setShowActiveFilter(false)} />
+      <SelectSheet visible={showSerialFilter} title="Tracking"
+        options={[{ value: 'all', label: 'All' }, { value: 'serial', label: 'Serial Tracked' }, { value: 'non-serial', label: 'Non-Serial' }]}
+        value={filterSerial} onSelect={v => setFilterSerial(v as 'all' | 'serial' | 'non-serial')} onClose={() => setShowSerialFilter(false)} />
 
       {/* ── Modals ────────────────────────────────────────────────────── */}
       <AddEditModal
