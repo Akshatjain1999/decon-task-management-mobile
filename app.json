@@ -39,7 +39,14 @@
           "sounds": []
         }
       ],
-      "@react-native-community/datetimepicker"
+      "@react-native-community/datetimepicker",
+      [
+        "react-native-vision-camera",
+        {
+          "cameraPermissionText": "Decon Task Manager uses the camera for barcode scanning.",
+          "enableCodeScanner": true
+        }
+      ]
     ],
     "extra": {
       "eas": {
