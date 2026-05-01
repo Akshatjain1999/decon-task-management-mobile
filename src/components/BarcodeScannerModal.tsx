@@ -72,10 +72,7 @@ export default function BarcodeScannerModal({
     lastScannedRef.current = value
     setTimeout(() => { lastScannedRef.current = null }, 1500)
 
-    if (scanned.includes(value)) {
-      Alert.alert('Duplicate', `Serial "${value}" already in the list.`)
-      return
-    }
+    if (scanned.includes(value)) return
     setScanned(prev => [...prev, value])
   }
 
@@ -86,10 +83,7 @@ export default function BarcodeScannerModal({
   function addManual() {
     const val = manualInput.trim()
     if (!val) return
-    if (scanned.includes(val)) {
-      Alert.alert('Duplicate', `Serial "${val}" already in the list.`)
-      return
-    }
+    if (scanned.includes(val)) return
     setScanned(prev => [...prev, val])
     setManualInput('')
   }
