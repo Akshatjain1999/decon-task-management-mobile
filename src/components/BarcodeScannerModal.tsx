@@ -48,9 +48,13 @@ const ROI = { x: 0.14, y: 0.225, width: 0.72, height: 0.55 }
 //   ]Q0  → QR code
 //   ]d2  → Data Matrix
 // These are decoder meta-data, not part of the actual barcode content.
+const MIN_BARCODE_LEN = 4
+
 function normalizeBarcode(raw: string): string {
   // Strip leading ]<letter><digit(s)> AIM prefix if present
-  return raw.replace(/^\][A-Za-z]\d+/, '').trim()
+  const stripped = raw.replace(/^\][A-Za-z]\d+/, '').trim()
+  // Reject noise / garbage reads that are too short
+  return stripped.length >= MIN_BARCODE_LEN ? stripped : ''
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
