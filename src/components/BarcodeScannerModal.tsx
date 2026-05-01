@@ -41,6 +41,18 @@ export interface BarcodeScannerModalProps {
 // ── ROI (VisionCamera, normalised 0-1) ────────────────────────────────────────
 const ROI = { x: 0.14, y: 0.225, width: 0.72, height: 0.55 }
 
+// ── AIM identifier stripper ───────────────────────────────────────────────────
+// Many barcode decoders prefix the raw value with a ]XX AIM identifier, e.g.
+//   ]C1  → Code 128 variant
+//   ]E0  → EAN-13 / EAN-8
+//   ]Q0  → QR code
+//   ]d2  → Data Matrix
+// These are decoder meta-data, not part of the actual barcode content.
+function normalizeBarcode(raw: string): string {
+  // Strip leading ]<letter><digit(s)> AIM prefix if present
+  return raw.replace(/^\][A-Za-z]\d+/, '').trim()
+}
+
 // ─────────────────────────────────────────────────────────────────────────────
 // Expo Go scanner — uses expo-camera (works in Expo Go)
 // ─────────────────────────────────────────────────────────────────────────────
@@ -76,7 +88,7 @@ function ExpoGoScannerView({ onCode }: { onCode: (value: string) => void }) {
         facing="back"
         barcodeScannerSettings={{ barcodeTypes: ['qr', 'code128', 'code39', 'ean13', 'ean8', 'datamatrix', 'code93'] }}
         onBarcodeScanned={({ data }: { data: string }) => {
-          const value = data?.trim()
+          const value = normalizeBarcode(data ?? '')
           if (!value) return
           if (lastRef.current === value) return
           lastRef.current = value
@@ -124,7 +136,7 @@ function VisionCameraScannerView({ onCode }: { onCode: (value: string) => void }
     regionOfInterest: ROI,
     onCodeScanned: (codes: Array<{ value?: string }>) => {
       for (const code of codes) {
-        const value = code.value?.trim()
+        const value = normalizeBarcode(code.value ?? '')
         if (!value) continue
         if (lastRef.current === value) continue
         lastRef.current = value
