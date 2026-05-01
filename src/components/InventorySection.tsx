@@ -12,6 +12,13 @@ import {
 import * as inventoryService from '../services/inventoryService'
 import type { DispatchStatus, InventoryMovement, RecordMovementRequest, TaskInventoryItem } from '../types'
 
+// ── Types ────────────────────────────────────────────────────────────────────
+
+interface SimpleSubtask {
+  id: number
+  title: string
+}
+
 // ── Constants ──────────────────────────────────────────────────────────────
 
 const STATUS_CONFIG: Record<DispatchStatus, { bg: string; text: string; label: string }> = {
@@ -34,6 +41,7 @@ const MOV_TYPE_CONFIG: Record<string, { bg: string; text: string }> = {
 interface Props {
   taskId: number
   isAdmin: boolean
+  subtasks?: SimpleSubtask[]
 }
 
 // ── Helpers ─────────────────────────────────────────────────────────────────
@@ -44,7 +52,7 @@ function today(): string {
 
 // ── Component ────────────────────────────────────────────────────────────────
 
-export default function InventorySection({ taskId, isAdmin }: Props) {
+export default function InventorySection({ taskId, isAdmin, subtasks = [] }: Props) {
   const [items, setItems] = useState<TaskInventoryItem[]>([])
   const [movements, setMovements] = useState<InventoryMovement[]>([])
   const [loading, setLoading] = useState(true)
@@ -58,6 +66,7 @@ export default function InventorySection({ taskId, isAdmin }: Props) {
   const [movQty, setMovQty] = useState('1')
   const [movNotes, setMovNotes] = useState('')
   const [movDate, setMovDate] = useState(today())
+  const [movSubtaskId, setMovSubtaskId] = useState<number | null>(null)
   const [movSaving, setMovSaving] = useState(false)
   const [movError, setMovError] = useState<string | null>(null)
 
@@ -86,6 +95,7 @@ export default function InventorySection({ taskId, isAdmin }: Props) {
     setMovQty('1')
     setMovNotes('')
     setMovDate(today())
+    setMovSubtaskId(null)
     setMovError(null)
     setMovOpen(true)
   }
@@ -97,7 +107,7 @@ export default function InventorySection({ taskId, isAdmin }: Props) {
     setMovSaving(true)
     setMovError(null)
     try {
-      const req: RecordMovementRequest = { quantity: qty, movementDate: movDate, notes: movNotes || undefined }
+      const req: RecordMovementRequest = { quantity: qty, movementDate: movDate, notes: movNotes || undefined, referenceSubtaskId: movSubtaskId ?? undefined }
       if (movType === 'DISPATCH') await inventoryService.recordDispatch(taskId, movItem.inventoryItemId, req)
       else if (movType === 'DELIVERY') await inventoryService.recordDelivery(taskId, movItem.inventoryItemId, req)
       else await inventoryService.recordReturn(taskId, movItem.inventoryItemId, req)
@@ -205,6 +215,14 @@ export default function InventorySection({ taskId, isAdmin }: Props) {
                 <View style={s.movLeft}>
                   <Text style={s.movItemName}>{m.itemName}</Text>
                   <Text style={s.movMeta}>{m.movementDate} · {m.performedByName}</Text>
+                  {m.referenceSubtaskId != null && (() => {
+                    const sub = subtasks.find(s => s.id === m.referenceSubtaskId)
+                    return (
+                      <View style={s.movSubtaskPill}>
+                        <Text style={s.movSubtaskText}>{sub ? sub.title : `Subtask #${m.referenceSubtaskId}`}</Text>
+                      </View>
+                    )
+                  })()}
                   {m.notes ? <Text style={s.movNotes}>{m.notes}</Text> : null}
                 </View>
                 <View style={s.movRight}>
@@ -245,6 +263,28 @@ export default function InventorySection({ taskId, isAdmin }: Props) {
                 <TextInput value={movDate} onChangeText={setMovDate} placeholder="2025-01-01" style={s.fieldInput} />
                 <Text style={s.fieldLabel}>Notes</Text>
                 <TextInput value={movNotes} onChangeText={setMovNotes} placeholder="Optional" style={s.fieldInput} />
+                {subtasks.length > 0 && (
+                  <>
+                    <Text style={s.fieldLabel}>Via Subtask <Text style={s.fieldLabelOpt}>(optional)</Text></Text>
+                    <TouchableOpacity
+                      style={[s.fieldInput, s.subtaskPickerBtn]}
+                      onPress={() => setMovSubtaskId(null)}
+                    >
+                      <Text style={movSubtaskId == null ? s.subtaskPickerNone : s.subtaskPickerSel}>
+                        {movSubtaskId == null ? '— None —' : subtasks.find(sub => sub.id === movSubtaskId)?.title ?? `#${movSubtaskId}`}
+                      </Text>
+                    </TouchableOpacity>
+                    {subtasks.map(sub => (
+                      <TouchableOpacity
+                        key={sub.id}
+                        style={[s.subtaskRow, sub.id === movSubtaskId && s.subtaskRowActive]}
+                        onPress={() => setMovSubtaskId(sub.id)}
+                      >
+                        <Text style={[s.subtaskRowText, sub.id === movSubtaskId && s.subtaskRowTextActive]}>{sub.title}</Text>
+                      </TouchableOpacity>
+                    ))}
+                  </>
+                )}
                 {movError ? <Text style={s.movErrText}>{movError}</Text> : null}
                 <TouchableOpacity style={s.submitBtn} onPress={submitMov} disabled={movSaving}>
                   {movSaving
@@ -317,4 +357,15 @@ const s = StyleSheet.create({
   movErrText: { color: '#ba1a1a', fontSize: 13, marginTop: 8 },
   submitBtn: { backgroundColor: '#006a66', borderRadius: 12, paddingVertical: 14, alignItems: 'center', marginTop: 20, marginBottom: 8 },
   submitBtnText: { color: '#fff', fontWeight: '700', fontSize: 15 },
+
+  movSubtaskPill: { marginTop: 3, alignSelf: 'flex-start', backgroundColor: '#eef2ff', paddingHorizontal: 7, paddingVertical: 2, borderRadius: 20 },
+  movSubtaskText: { fontSize: 10, fontWeight: '700', color: '#4338ca' },
+  fieldLabelOpt: { fontWeight: '400', textTransform: 'none', letterSpacing: 0 },
+  subtaskPickerBtn: { justifyContent: 'center', marginBottom: 4 },
+  subtaskPickerNone: { color: '#9aa0a6', fontSize: 14 },
+  subtaskPickerSel: { color: '#0e1a23', fontWeight: '600', fontSize: 14 },
+  subtaskRow: { paddingVertical: 10, paddingHorizontal: 12, borderRadius: 8, marginBottom: 3, backgroundColor: '#f1f4f6' },
+  subtaskRowActive: { backgroundColor: '#006a66' },
+  subtaskRowText: { fontSize: 13, color: '#0e1a23' },
+  subtaskRowTextActive: { fontSize: 13, color: '#fff', fontWeight: '600' },
 })

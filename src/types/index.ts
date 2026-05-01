@@ -331,10 +331,12 @@ export interface InventoryMovement {
   movementDate: string
   performedByName: string
   notes: string | null
+  referenceSubtaskId: number | null
 }
 
 export interface RecordMovementRequest {
   quantity: number
   notes?: string
   movementDate: string
+  referenceSubtaskId?: number
 }
