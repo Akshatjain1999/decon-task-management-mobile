@@ -73,11 +73,20 @@ function normalizeBarcode(raw: string): string {
 function ExpoGoScannerView({ onCode }: { onCode: (value: string) => void }) {
   const { CameraView, useCameraPermissions } = require('expo-camera')
   const [permission, requestPermission] = useCameraPermissions()
-  const lastRef = useRef<string | null>(null)
+  const [detected, setDetected] = useState<string | null>(null)
+  const lockRef = useRef(false)
 
   useEffect(() => {
     if (permission && !permission.granted) requestPermission()
   }, [permission?.granted])
+
+  function capture() {
+    if (!detected || lockRef.current) return
+    lockRef.current = true
+    onCode(detected)
+    setDetected(null)
+    setTimeout(() => { lockRef.current = false }, 800)
+  }
 
   if (!permission) return <View style={sv.box}><ActivityIndicator color={C.primary} /></View>
 
@@ -103,14 +112,9 @@ function ExpoGoScannerView({ onCode }: { onCode: (value: string) => void }) {
         barcodeScannerSettings={{ barcodeTypes: ['code128', 'code39'] }}
         onBarcodeScanned={({ data }: { data: string }) => {
           const value = normalizeBarcode(data ?? '')
-          if (!value) return
-          if (lastRef.current === value) return
-          lastRef.current = value
-          setTimeout(() => { lastRef.current = null }, 1500)
-          onCode(value)
+          if (value) setDetected(value)
         }}
       />
-      {/* Visual ROI overlay */}
       <View style={sv.maskTop} pointerEvents="none" />
       <View style={sv.maskBottom} pointerEvents="none" />
       <View style={sv.maskLeft} pointerEvents="none" />
@@ -121,7 +125,9 @@ function ExpoGoScannerView({ onCode }: { onCode: (value: string) => void }) {
         <View style={[sv.corner, sv.cornerBL]} />
         <View style={[sv.corner, sv.cornerBR]} />
       </View>
-      <Text style={sv.hint}>Align barcode within the frame</Text>
+      <TouchableOpacity style={[sv.scanBtn, !detected && sv.scanBtnDim]} onPress={capture} activeOpacity={0.85}>
+        <Text style={sv.scanBtnText} numberOfLines={1}>{detected ? `Capture  ${detected}` : 'Align barcode in frame…'}</Text>
+      </TouchableOpacity>
     </View>
   )
 }
@@ -139,11 +145,20 @@ function VisionCameraScannerView({ onCode }: { onCode: (value: string) => void }
 
   const device = useCameraDevice('back')
   const { hasPermission, requestPermission } = useCameraPermission()
-  const lastRef = useRef<string | null>(null)
+  const [detected, setDetected] = useState<string | null>(null)
+  const lockRef = useRef(false)
 
   useEffect(() => {
     if (!hasPermission) requestPermission()
   }, [hasPermission])
+
+  function capture() {
+    if (!detected || lockRef.current) return
+    lockRef.current = true
+    onCode(detected)
+    setDetected(null)
+    setTimeout(() => { lockRef.current = false }, 800)
+  }
 
   const codeScanner = useCodeScanner({
     codeTypes: ['code-128', 'code-39'],
@@ -151,12 +166,7 @@ function VisionCameraScannerView({ onCode }: { onCode: (value: string) => void }
     onCodeScanned: (codes: Array<{ value?: string }>) => {
       for (const code of codes) {
         const value = normalizeBarcode(code.value ?? '')
-        if (!value) continue
-        if (lastRef.current === value) continue
-        lastRef.current = value
-        setTimeout(() => { lastRef.current = null }, 1500)
-        onCode(value)
-        break
+        if (value) { setDetected(value); break }
       }
     },
   })
@@ -202,7 +212,9 @@ function VisionCameraScannerView({ onCode }: { onCode: (value: string) => void }
         <View style={[sv.corner, sv.cornerBL]} />
         <View style={[sv.corner, sv.cornerBR]} />
       </View>
-      <Text style={sv.hint}>Align barcode within the frame</Text>
+      <TouchableOpacity style={[sv.scanBtn, !detected && sv.scanBtnDim]} onPress={capture} activeOpacity={0.85}>
+        <Text style={sv.scanBtnText} numberOfLines={1}>{detected ? `Capture  ${detected}` : 'Align barcode in frame…'}</Text>
+      </TouchableOpacity>
     </View>
   )
 }
@@ -230,7 +242,9 @@ const sv = StyleSheet.create({
   cornerTR:   { top: 0,    right: 0, borderTopWidth: 3,    borderRightWidth: 3 },
   cornerBL:   { bottom: 0, left: 0,  borderBottomWidth: 3, borderLeftWidth: 3  },
   cornerBR:   { bottom: 0, right: 0, borderBottomWidth: 3, borderRightWidth: 3 },
-  hint: { position: 'absolute', bottom: pct(ROI_BOTTOM + 0.04), alignSelf: 'center', color: 'rgba(255,255,255,0.8)', fontSize: 11, backgroundColor: 'rgba(0,0,0,0.35)', paddingHorizontal: 10, paddingVertical: 3, borderRadius: 20 },
+  scanBtn:    { position: 'absolute', bottom: 12, alignSelf: 'center', backgroundColor: C.primary, paddingHorizontal: 18, paddingVertical: 9, borderRadius: 24, maxWidth: '82%' },
+  scanBtnDim: { backgroundColor: 'rgba(0,106,102,0.45)' },
+  scanBtnText: { color: '#fff', fontWeight: '700', fontSize: 13 },
 })
 
 // ── Main component ────────────────────────────────────────────────────────────
