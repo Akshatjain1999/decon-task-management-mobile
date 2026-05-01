@@ -94,7 +94,7 @@ function ExpoGoScannerView({ onCode }: { onCode: (value: string) => void }) {
       <CameraView
         style={StyleSheet.absoluteFillObject}
         facing="back"
-        barcodeScannerSettings={{ barcodeTypes: ['qr', 'code128', 'code39', 'ean13', 'ean8', 'datamatrix', 'code93'] }}
+        barcodeScannerSettings={{ barcodeTypes: ['code128', 'code39', 'ean13', 'ean8', 'datamatrix', 'code93'] }}
         onBarcodeScanned={({ data }: { data: string }) => {
           const value = normalizeBarcode(data ?? '')
           if (!value) return
@@ -140,7 +140,7 @@ function VisionCameraScannerView({ onCode }: { onCode: (value: string) => void }
   }, [hasPermission])
 
   const codeScanner = useCodeScanner({
-    codeTypes: ['qr', 'code-128', 'code-39', 'ean-13', 'ean-8', 'data-matrix', 'code-93'],
+    codeTypes: ['code-128', 'code-39', 'ean-13', 'ean-8', 'data-matrix', 'code-93'],
     regionOfInterest: ROI,
     onCodeScanned: (codes: Array<{ value?: string }>) => {
       for (const code of codes) {
