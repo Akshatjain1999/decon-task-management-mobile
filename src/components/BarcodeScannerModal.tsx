@@ -1,6 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react'
 import {
-  AppState,
+  Linking,
   Modal,
   View,
   Text,
@@ -54,24 +54,15 @@ export default function BarcodeScannerModal({
   const [manualInput, setManualInput] = useState('')
   const lastScannedRef = useRef<string | null>(null)
 
-  // Reset state when modal opens
+  // Reset state when modal opens + immediately ask for permission
   useEffect(() => {
     if (!visible) return
     setScanned([])
     setManualInput('')
     lastScannedRef.current = null
+    // Auto-request: if not yet determined or not granted, show the OS dialog immediately
+    requestPermission()
   }, [visible])
-
-  // Re-check permission when app returns to foreground (after OS dialog resolves)
-  useEffect(() => {
-    if (!visible) return
-    const sub = AppState.addEventListener('change', state => {
-      if (state === 'active' && permission && !permission.granted) {
-        requestPermission()
-      }
-    })
-    return () => sub.remove()
-  }, [visible, permission])
 
   function handleBarcode(result: BarcodeScanningResult) {
     const value = result.data?.trim()
@@ -114,33 +105,35 @@ export default function BarcodeScannerModal({
   if (!visible) return null
 
   // ── Permission gate ────────────────────────────────────────────────────────
-  const cardPadding = { paddingBottom: Math.max(24, insets.bottom + 16) }
+  const cardPadding = { paddingBottom: Math.max(32, insets.bottom + 20) }
 
-  if (!permission) {
+  // Still loading permission status or the OS dialog is open
+  if (!permission || !permission.granted) {
+    const denied = permission && !permission.canAskAgain
     return (
       <Modal visible transparent animationType="slide">
         <View style={styles.overlay}>
           <View style={[styles.card, cardPadding]}>
-            <ActivityIndicator color={C.primary} />
-          </View>
-        </View>
-      </Modal>
-    )
-  }
-
-  if (!permission.granted) {
-    return (
-      <Modal visible transparent animationType="slide">
-        <View style={styles.overlay}>
-          <View style={[styles.card, cardPadding]}>
-            <Text style={styles.title}>Camera permission required</Text>
-            <Text style={[styles.sub, { marginBottom: 20 }]}>
-              Barcode scanning requires camera access.
-            </Text>
-            <TouchableOpacity style={styles.btnPrimary} onPress={requestPermission}>
-              <Text style={styles.btnPrimaryText}>Grant permission</Text>
-            </TouchableOpacity>
-            <TouchableOpacity style={[styles.btnGhost, { marginTop: 10 }]} onPress={onCancel}>
+            {!permission ? (
+              <ActivityIndicator color={C.primary} size="large" />
+            ) : (
+              <>
+                <Text style={styles.title}>
+                  {denied ? 'Camera access denied' : 'Requesting camera…'}
+                </Text>
+                <Text style={[styles.sub, { marginBottom: 20 }]}>
+                  {denied
+                    ? 'Please enable camera access in your device Settings.'
+                    : 'Please allow camera access when prompted.'}
+                </Text>
+                {denied && (
+                  <TouchableOpacity style={styles.btnPrimary} onPress={() => Linking.openSettings()}>
+                    <Text style={styles.btnPrimaryText}>Open Settings</Text>
+                  </TouchableOpacity>
+                )}
+              </>
+            )}
+            <TouchableOpacity style={[styles.btnGhost, { marginTop: 12 }]} onPress={onCancel}>
               <Text style={styles.btnGhostText}>Cancel</Text>
             </TouchableOpacity>
           </View>
