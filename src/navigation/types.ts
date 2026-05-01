@@ -13,6 +13,7 @@ export type RootStackParamList = {
 export type BottomTabParamList = {
   Dashboard: undefined
   Tasks: undefined
+  Inventory: undefined
   Notifications: undefined
   Profile: undefined
 }

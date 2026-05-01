@@ -1,5 +1,39 @@
 import api from './api'
-import type { TaskInventoryItem, InventoryMovement, RecordMovementRequest } from '@/types'
+import type {
+  TaskInventoryItem,
+  InventoryMovement,
+  RecordMovementRequest,
+  InventoryItem,
+  InventoryDashboard,
+  CreateInventoryItemRequest,
+  UpdateInventoryItemRequest,
+  TaskType,
+} from '@/types'
+
+// ── Catalog ───────────────────────────────────────────────────────────────────
+
+export async function getCatalog(taskType?: TaskType): Promise<InventoryItem[]> {
+  const params = taskType ? { taskType } : {}
+  const res = await api.get<InventoryItem[]>('/api/v1/inventory/catalog', { params })
+  return res.data
+}
+
+export async function getInventoryDashboard(): Promise<InventoryDashboard> {
+  const res = await api.get<InventoryDashboard>('/api/v1/inventory/dashboard')
+  return res.data
+}
+
+export async function createInventoryItem(req: CreateInventoryItemRequest): Promise<InventoryItem> {
+  const res = await api.post<InventoryItem>('/api/v1/inventory/catalog', req)
+  return res.data
+}
+
+export async function updateInventoryItem(itemId: number, req: UpdateInventoryItemRequest): Promise<InventoryItem> {
+  const res = await api.put<InventoryItem>(`/api/v1/inventory/catalog/${itemId}`, req)
+  return res.data
+}
+
+// ── Task-level inventory ──────────────────────────────────────────────────────
 
 export async function getTaskInventory(taskId: number): Promise<TaskInventoryItem[]> {
   const res = await api.get<TaskInventoryItem[]>(`/api/v1/tasks/${taskId}/inventory`)

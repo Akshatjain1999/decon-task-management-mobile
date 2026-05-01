@@ -307,6 +307,48 @@ export type InventoryCategory = 'CAMERA' | 'NVR_STORAGE' | 'RACK' | 'NETWORK' | 
 export type MovementType = 'STOCK_IN' | 'DISPATCH' | 'DELIVERY' | 'RETURN' | 'ADJUSTMENT'
 export type DispatchStatus = 'PENDING' | 'PARTIALLY_DISPATCHED' | 'DISPATCHED' | 'DELIVERED'
 
+export interface InventoryItem {
+  id: number
+  name: string
+  unit: string
+  taskType: TaskType
+  category: InventoryCategory
+  description: string | null
+  stockQuantity: number
+  minStockAlert: number
+  isActive: boolean
+  lowStock: boolean
+  serialTracked: boolean
+  createdAt: string
+}
+
+export interface InventoryDashboard {
+  totalItems: number
+  lowStockItems: number
+  outOfStockItems: number
+  lowStockList: InventoryItem[]
+}
+
+export interface CreateInventoryItemRequest {
+  name: string
+  unit: string
+  taskType: TaskType
+  category: InventoryCategory
+  description?: string
+  minStockAlert?: number
+  serialTracked?: boolean
+}
+
+export interface UpdateInventoryItemRequest {
+  name?: string
+  unit?: string
+  category?: InventoryCategory
+  description?: string
+  minStockAlert?: number
+  isActive?: boolean
+  serialTracked?: boolean
+}
+
 export interface TaskInventoryItem {
   id: number
   inventoryItemId: number

@@ -5,6 +5,7 @@ import DashboardScreen from '../screens/DashboardScreen'
 import TaskListScreen from '../screens/TaskListScreen'
 import NotificationsScreen from '../screens/NotificationsScreen'
 import ProfileScreen from '../screens/ProfileScreen'
+import InventoryScreen from '../screens/InventoryScreen'
 import { useAppSelector } from '../store/hooks'
 import type { BottomTabParamList } from './types'
 
@@ -13,6 +14,7 @@ const Tab = createBottomTabNavigator<BottomTabParamList>()
 const TAB_ICONS: Record<string, string> = {
   Dashboard: '🏠',
   Tasks: '📋',
+  Inventory: '📦',
   Notifications: '🔔',
   Profile: '👤',
 }
@@ -67,6 +69,7 @@ export default function BottomTabs() {
     >
       <Tab.Screen name="Dashboard" component={DashboardScreen} />
       <Tab.Screen name="Tasks" component={TaskListScreen} options={{ title: 'Tasks' }} />
+      <Tab.Screen name="Inventory" component={InventoryScreen} />
       <Tab.Screen name="Notifications" component={NotificationsScreen} />
       <Tab.Screen name="Profile" component={ProfileScreen} />
     </Tab.Navigator>
