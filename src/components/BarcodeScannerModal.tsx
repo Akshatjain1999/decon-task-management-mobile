@@ -48,15 +48,16 @@ const ROI = { x: 0.14, y: 0.225, width: 0.72, height: 0.55 }
 //   ]Q0  → QR code
 //   ]d2  → Data Matrix
 // These are decoder meta-data, not part of the actual barcode content.
-const MIN_BARCODE_LEN = 4
-// Allow letters, digits, hyphens, underscores, dots, and forward slashes only
-const VALID_BARCODE_RE = /^[A-Za-z0-9\-_.\/]+$/
+const SERIAL_LEN = 6
+// Allow letters and digits only (no hyphens/dots — serials are plain alphanumeric)
+const VALID_BARCODE_RE = /^[A-Za-z0-9]+$/
 
 function normalizeBarcode(raw: string): string {
   // Strip leading ]<letter><digit(s)> AIM prefix if present
   const stripped = raw.replace(/^\][A-Za-z]\d+/, '').trim()
-  // Reject noise / garbage reads that are too short or contain special characters
-  if (stripped.length < MIN_BARCODE_LEN) return ''
+  // Reject if not exactly the expected serial length
+  if (stripped.length !== SERIAL_LEN) return ''
+  // Reject if contains anything other than letters and digits
   if (!VALID_BARCODE_RE.test(stripped)) return ''
   return stripped
 }
@@ -94,7 +95,7 @@ function ExpoGoScannerView({ onCode }: { onCode: (value: string) => void }) {
       <CameraView
         style={StyleSheet.absoluteFillObject}
         facing="back"
-        barcodeScannerSettings={{ barcodeTypes: ['code128', 'code39', 'ean13', 'ean8', 'datamatrix', 'code93'] }}
+        barcodeScannerSettings={{ barcodeTypes: ['code128'] }}
         onBarcodeScanned={({ data }: { data: string }) => {
           const value = normalizeBarcode(data ?? '')
           if (!value) return
@@ -140,7 +141,7 @@ function VisionCameraScannerView({ onCode }: { onCode: (value: string) => void }
   }, [hasPermission])
 
   const codeScanner = useCodeScanner({
-    codeTypes: ['code-128', 'code-39', 'ean-13', 'ean-8', 'data-matrix', 'code-93'],
+    codeTypes: ['code-128'],
     regionOfInterest: ROI,
     onCodeScanned: (codes: Array<{ value?: string }>) => {
       for (const code of codes) {
