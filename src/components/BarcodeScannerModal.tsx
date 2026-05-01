@@ -10,7 +10,7 @@ import {
   Alert,
   ActivityIndicator,
 } from 'react-native'
-import { CameraView, useCameraPermissions, type BarcodeScanningResult } from 'expo-camera'
+import { Camera, CameraView, type BarcodeScanningResult } from 'expo-camera'
 
 // ── Palette ──────────────────────────────────────────────────────────────────
 const C = {
@@ -46,19 +46,24 @@ export default function BarcodeScannerModal({
   onConfirm,
   onCancel,
 }: BarcodeScannerModalProps) {
-  const [permission, requestPermission] = useCameraPermissions()
+  const [hasPermission, setHasPermission] = useState<boolean | null>(null)
   const [scanned, setScanned] = useState<string[]>([])
   const [manualInput, setManualInput] = useState('')
   const lastScannedRef = useRef<string | null>(null)
 
-  // Reset state whenever modal opens
+  // Check permission and reset state whenever modal opens
   React.useEffect(() => {
-    if (visible) {
-      setScanned([])
-      setManualInput('')
-      lastScannedRef.current = null
-    }
+    if (!visible) return
+    setScanned([])
+    setManualInput('')
+    lastScannedRef.current = null
+    Camera.getCameraPermissionsAsync().then(({ granted }) => setHasPermission(granted))
   }, [visible])
+
+  async function requestPermission() {
+    const { granted } = await Camera.requestCameraPermissionsAsync()
+    setHasPermission(granted)
+  }
 
   function handleBarcode(result: BarcodeScanningResult) {
     const value = result.data?.trim()
@@ -101,7 +106,7 @@ export default function BarcodeScannerModal({
   if (!visible) return null
 
   // ── Permission gate ────────────────────────────────────────────────────────
-  if (!permission) {
+  if (hasPermission === null) {
     return (
       <Modal visible transparent animationType="slide">
         <View style={styles.overlay}>
@@ -113,7 +118,7 @@ export default function BarcodeScannerModal({
     )
   }
 
-  if (!permission.granted) {
+  if (!hasPermission) {
     return (
       <Modal visible transparent animationType="slide">
         <View style={styles.overlay}>
