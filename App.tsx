@@ -21,6 +21,19 @@ function Root() {
     dispatch(restoreSession())
   }, [dispatch])
 
+  // Request location permission at app start for all users so the OS prompt
+  // appears once upfront rather than surprising the user mid-workflow.
+  useEffect(() => {
+    (async () => {
+      try {
+        const Location = require('expo-location')
+        await Location.requestForegroundPermissionsAsync()
+      } catch {
+        // expo-location not available in this build — ignore
+      }
+    })()
+  }, [])
+
   // Wire global session-expired handler — when api.ts sees a 401 it will
   // call this, we dispatch logout (which clears token in redux) and the
   // navigator automatically swaps to the Login stack.
