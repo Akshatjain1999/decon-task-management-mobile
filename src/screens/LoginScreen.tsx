@@ -25,7 +25,7 @@ export default function LoginScreen() {
       Alert.alert('Validation', 'Email and password are required.')
       return
     }
-    dispatch(login({ email: email.trim(), password }))
+    dispatch(login({ email: email.trim().toLowerCase(), password }))
   }
 
   return (
