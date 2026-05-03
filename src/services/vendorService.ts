@@ -44,7 +44,7 @@ export const vendorBucketService = {
     const res = await api.get(`/api/v1/tasks/${taskId}/vendor-bucket`)
     return (res.data as any).data ?? res.data
   },
-  async submit(taskId: number, payload: { latitude: number; longitude: number; items: SubmitConsumptionItem[] }): Promise<ConsumptionResponse> {
+  async submit(taskId: number, payload: { latitude: number; longitude: number; accuracyM?: number; items: SubmitConsumptionItem[] }): Promise<ConsumptionResponse> {
     const res = await api.post(`/api/v1/tasks/${taskId}/consumption`, payload)
     return (res.data as any).data ?? res.data
   },

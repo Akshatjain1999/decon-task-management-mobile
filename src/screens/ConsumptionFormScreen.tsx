@@ -33,6 +33,7 @@ export default function ConsumptionFormScreen({ route, navigation }: Props) {
   const [otherTasks, setOtherTasks] = useState<Task[]>([])
   const [latitude, setLatitude] = useState<string>('')
   const [longitude, setLongitude] = useState<string>('')
+  const [accuracyM, setAccuracyM] = useState<number | undefined>(undefined)
   const [loading, setLoading] = useState(true)
   const [submitting, setSubmitting] = useState(false)
   const [locating, setLocating] = useState(false)
@@ -73,6 +74,7 @@ export default function ConsumptionFormScreen({ route, navigation }: Props) {
       const pos = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.High })
       setLatitude(String(pos.coords.latitude))
       setLongitude(String(pos.coords.longitude))
+      if (pos.coords.accuracy != null) setAccuracyM(pos.coords.accuracy)
     } catch (e: any) {
       Alert.alert('Location unavailable', e?.message || 'expo-location not installed')
     } finally {
@@ -129,6 +131,7 @@ export default function ConsumptionFormScreen({ route, navigation }: Props) {
       await vendorBucketService.submit(taskId, {
         latitude: Number(latitude),
         longitude: Number(longitude),
+        accuracyM,
         items: payloadItems,
       })
       Alert.alert('Submitted', 'Consumption awaiting approval.')
