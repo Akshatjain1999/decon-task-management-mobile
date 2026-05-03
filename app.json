@@ -31,6 +31,12 @@
     "plugins": [
       "expo-sharing",
       [
+        "expo-location",
+        {
+          "locationAlwaysAndWhenInUsePermission": "Decon Task Manager uses your location to verify on-site consumption (within 50m of the task)."
+        }
+      ],
+      [
         "expo-notifications",
         {
           "icon": "./assets/icon.png",

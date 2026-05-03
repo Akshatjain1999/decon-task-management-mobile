@@ -6,6 +6,7 @@ import TaskDetailScreen from '../screens/TaskDetailScreen'
 import CreateTaskScreen from '../screens/CreateTaskScreen'
 import TaskTypeDashboardScreen from '../screens/TaskTypeDashboardScreen'
 import WorkflowDetailScreen from '../screens/WorkflowDetailScreen'
+import ConsumptionFormScreen from '../screens/ConsumptionFormScreen'
 import BottomTabs from './BottomTabs'
 import type { RootStackParamList } from './types'
 
@@ -48,6 +49,11 @@ export default function AppNavigator() {
             name="WorkflowDetail"
             component={WorkflowDetailScreen}
             options={{ headerShown: false }}
+          />
+          <Stack.Screen
+            name="ConsumptionForm"
+            component={ConsumptionFormScreen}
+            options={{ title: 'Submit Consumption' }}
           />
         </>
       ) : (

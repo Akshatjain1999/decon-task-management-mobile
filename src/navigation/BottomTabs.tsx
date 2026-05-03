@@ -21,6 +21,8 @@ const TAB_ICONS: Record<string, string> = {
 
 export default function BottomTabs() {
   const unreadCount = useAppSelector((s) => s.notifications.unreadCount)
+  const role = useAppSelector((s) => s.auth.user?.role)
+  const isVendor = role === 'VENDOR'
 
   return (
     <Tab.Navigator
@@ -67,9 +69,17 @@ export default function BottomTabs() {
         tabBarLabelStyle: { fontSize: 11, fontWeight: '600' },
       })}
     >
-      <Tab.Screen name="Dashboard" component={DashboardScreen} />
+      <Tab.Screen
+        name="Dashboard"
+        component={DashboardScreen}
+        options={isVendor ? { tabBarButton: () => null, tabBarItemStyle: { display: 'none' } } : undefined}
+      />
       <Tab.Screen name="Tasks" component={TaskListScreen} options={{ title: 'Tasks' }} />
-      <Tab.Screen name="Inventory" component={InventoryScreen} />
+      <Tab.Screen
+        name="Inventory"
+        component={InventoryScreen}
+        options={isVendor ? { tabBarButton: () => null, tabBarItemStyle: { display: 'none' } } : undefined}
+      />
       <Tab.Screen name="Notifications" component={NotificationsScreen} />
       <Tab.Screen name="Profile" component={ProfileScreen} />
     </Tab.Navigator>

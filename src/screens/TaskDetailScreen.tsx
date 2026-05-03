@@ -856,6 +856,31 @@ export default function TaskDetailScreen({ route, navigation }: Props) {
           </View>
         </View>
 
+        {/* ── Vendor Consumption CTA ──────────────────────────────────── */}
+        {(() => {
+          const isVendor = (currentUser?.role ?? '').toUpperCase() === 'VENDOR'
+          const isVendorOwner = !!(task as any).vendorOwner && (task as any).vendorOwner.id === currentUser?.userId
+          const liveDone = !!(task.subtasks ?? []).some(
+            (s: any) => s.subtaskKind === 'LIVE' && s.status === 'DONE',
+          )
+          if (!(isVendor && isVendorOwner && liveDone)) return null
+          return (
+            <TouchableOpacity
+              onPress={() => navigation.navigate('ConsumptionForm', { taskId: task.id })}
+              style={{
+                backgroundColor: '#006a66',
+                marginHorizontal: 16,
+                marginTop: 12,
+                paddingVertical: 12,
+                borderRadius: 12,
+                alignItems: 'center',
+              }}
+            >
+              <Text style={{ color: '#fff', fontWeight: '700' }}>📋 Fill Consumption Form</Text>
+            </TouchableOpacity>
+          )
+        })()}
+
         {/* ── Tabs ────────────────────────────────────────────────────── */}
         <View style={styles.tabBar}>
           {(['details', 'subtasks', 'comments', 'activity', 'inventory'] as Tab[]).map((tab) => (

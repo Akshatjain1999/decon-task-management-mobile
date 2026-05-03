@@ -47,6 +47,7 @@ export interface Subtask {
   startDate?: string | null              // ISO yyyy-MM-dd
   endDate?: string | null                // ISO yyyy-MM-dd
   estimatedMinutes?: number | null
+  subtaskKind?: 'NORMAL' | 'INSTALLATION' | 'LIVE'
 }
 
 export interface SubtaskNote {
@@ -87,6 +88,10 @@ export interface Task {
   commentsCount: number
   subtasksTotal: number
   subtasksCompleted: number
+  vendorOwner?: User | null
+  latitude?: number | null
+  longitude?: number | null
+  geofenceRadiusM?: number | null
 }
 
 export interface CreateTaskRequest {
