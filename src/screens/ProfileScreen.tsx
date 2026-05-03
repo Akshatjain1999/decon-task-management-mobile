@@ -1,12 +1,51 @@
-import React from 'react'
-import { View, Text, TouchableOpacity, StyleSheet, Alert } from 'react-native'
+import React, { useState } from 'react'
+import { View, Text, TouchableOpacity, StyleSheet, Alert, ActivityIndicator } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { useAppDispatch, useAppSelector } from '../store/hooks'
 import { logout } from '../store/authSlice'
+import * as Updates from 'expo-updates'
 
 export default function ProfileScreen() {
   const dispatch = useAppDispatch()
   const user = useAppSelector((s) => s.auth.user)
+  const [updateChecking, setUpdateChecking] = useState(false)
+  const [updateStatus, setUpdateStatus] = useState<'up-to-date' | 'downloading' | null>(null)
+
+  const handleCheckUpdate = async () => {
+    // expo-updates does not work in Expo Go
+    if (!Updates.isEmbeddedLaunch !== undefined && (Updates as any).appOwnership === 'expo') {
+      Alert.alert('Updates', 'OTA updates are not available in Expo Go.')
+      return
+    }
+    setUpdateChecking(true)
+    setUpdateStatus(null)
+    try {
+      const check = await Updates.checkForUpdateAsync()
+      if (!check.isAvailable) {
+        setUpdateStatus('up-to-date')
+        return
+      }
+      setUpdateStatus('downloading')
+      await Updates.fetchUpdateAsync()
+      Alert.alert(
+        'Update Ready',
+        'A new version has been downloaded. The app will now restart.',
+        [{ text: 'Restart', onPress: () => Updates.reloadAsync() }],
+      )
+    } catch {
+      setUpdateStatus(null)
+      Alert.alert('Update Check Failed', 'Could not check for updates. Please try again later.')
+    } finally {
+      setUpdateChecking(false)
+    }
+  }
+
+  const updateBtnLabel = () => {
+    if (updateChecking && updateStatus === 'downloading') return 'Downloading…'
+    if (updateChecking) return 'Checking…'
+    if (updateStatus === 'up-to-date') return '✓ App is up to date'
+    return '⬆ Check for Updates'
+  }
 
   const handleLogout = () => {
     Alert.alert('Sign Out', 'Are you sure you want to sign out?', [
@@ -29,6 +68,17 @@ export default function ProfileScreen() {
           <Text style={styles.roleText}>{user?.role?.replace('_', ' ')}</Text>
         </View>
       </View>
+
+      <TouchableOpacity
+        style={[styles.updateBtn, updateChecking && styles.updateBtnDisabled]}
+        onPress={handleCheckUpdate}
+        disabled={updateChecking}
+      >
+        {updateChecking ? <ActivityIndicator color="#006a66" style={{ marginRight: 8 }} /> : null}
+        <Text style={[styles.updateText, updateStatus === 'up-to-date' && styles.updateTextDone]}>
+          {updateBtnLabel()}
+        </Text>
+      </TouchableOpacity>
 
       <TouchableOpacity style={styles.logoutBtn} onPress={handleLogout}>
         <Text style={styles.logoutText}>Sign Out</Text>
@@ -69,6 +119,20 @@ const styles = StyleSheet.create({
     paddingVertical: 4,
   },
   roleText: { fontSize: 12, fontWeight: '600', color: '#1a237e' },
+  updateBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderRadius: 12,
+    padding: 16,
+    marginBottom: 12,
+    borderWidth: 1.5,
+    borderColor: '#006a66',
+    backgroundColor: '#e6f7f6',
+  },
+  updateBtnDisabled: { opacity: 0.6 },
+  updateText: { color: '#006a66', fontWeight: '700', fontSize: 15 },
+  updateTextDone: { color: '#2e7d32' },
   logoutBtn: {
     backgroundColor: '#ba1a1a',
     borderRadius: 12,

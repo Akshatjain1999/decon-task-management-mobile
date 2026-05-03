@@ -3,6 +3,12 @@
     "name": "Decon Task Manager",
     "slug": "decon-task-management-mobile",
     "version": "1.0.0",
+    "updates": {
+      "url": "https://u.expo.dev/79d6d060-070a-4e52-aee6-86ed7e73f3a5"
+    },
+    "runtimeVersion": {
+      "policy": "appVersion"
+    },
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "light",
