@@ -24,6 +24,7 @@ import type { RootStackParamList } from '../navigation/types'
 import { API_BASE_URL } from '../services/api'
 import { taskService } from '../services/taskService'
 import { userService } from '../services/userService'
+import { customFieldService, type CustomField } from '../services/customFieldService'
 import { useAppDispatch, useAppSelector } from '../store/hooks'
 import { updateTask, fetchTasks } from '../store/taskSlice'
 import type { Task, TaskStatus, Comment, TaskAuditsResponse, Subtask, SubtaskNote, SubtaskStatus, User } from '../types'
@@ -120,12 +121,20 @@ export default function TaskDetailScreen({ route, navigation }: Props) {
   const { taskId, openSubtaskId } = route.params
   const dispatch = useAppDispatch()
   const currentUser = useAppSelector((s) => s.auth.user)
+  const permissions = useAppSelector((s) => s.auth.permissions)
 
   const { message: toastMsg, visible: toastVisible, opacity: toastOpacity, showToast } = useToast()
 
   const [task, setTask] = useState<Task | null>(null)
   const [loading, setLoading] = useState(true)
   const [activeTab, setActiveTab] = useState<Tab>('details')
+  const [customFieldsConfig, setCustomFieldsConfig] = useState<CustomField[]>([])
+
+  const canUpdateTask = permissions ? permissions.taskUpdate : true
+  const canDeleteTask = permissions ? permissions.taskDelete : (currentUser?.role ?? '').toUpperCase().includes('ADMIN')
+  const canCreateSubtask = permissions ? permissions.subtaskCreate : true
+  const canUpdateSubtask = permissions ? permissions.subtaskUpdate : true
+  const canDeleteSubtask = permissions ? permissions.subtaskDelete : (currentUser?.role ?? '').toUpperCase().includes('ADMIN')
 
   // Comments
   const [commentText, setCommentText] = useState('')
@@ -237,6 +246,7 @@ export default function TaskDetailScreen({ route, navigation }: Props) {
 
   useEffect(() => {
     userService.getAll().then(setUsers).catch(() => {})
+    customFieldService.getAll().then(setCustomFieldsConfig).catch((err) => console.warn('Failed to load custom fields config', err))
   }, [])
 
   const loadAudits = useCallback(async () => {
@@ -515,6 +525,16 @@ export default function TaskDetailScreen({ route, navigation }: Props) {
   const pColor = PRIORITY_COLORS[task.priority] ?? PRIORITY_COLORS.MEDIUM
   const sBadge = STATUS_BADGE[task.status] ?? { bg: '#e0e3e5', text: '#44474c' }
   const completionPct = task.subtasksTotal > 0 ? Math.round((task.subtasksCompleted / task.subtasksTotal) * 100) : 0
+
+  const start = task.startDate
+    ? new Date(task.startDate).toLocaleDateString('en', { day: 'numeric', month: 'short' })
+    : null
+  const deadline = task.endDate
+    ? new Date(task.endDate).toLocaleDateString('en', { day: 'numeric', month: 'short', year: 'numeric' })
+    : null
+  const fallbackDue = !start && !deadline && task.dueDate
+    ? new Date(task.dueDate).toLocaleDateString('en', { day: 'numeric', month: 'short', year: 'numeric' })
+    : null
 
   return (
     <SafeAreaView style={styles.container} edges={['bottom']}>
@@ -824,10 +844,22 @@ export default function TaskDetailScreen({ route, navigation }: Props) {
                   <Text style={styles.heroMetaBold}>{task.assignedTo.name}</Text>
                 </Text>
               )}
-              {task.dueDate && (
+              {start && (
+                <Text style={styles.heroMetaItem}>
+                  <Text style={styles.heroMetaMuted}>Start  </Text>
+                  <Text style={styles.heroMetaBold}>{start}</Text>
+                </Text>
+              )}
+              {deadline && (
+                <Text style={styles.heroMetaItem}>
+                  <Text style={styles.heroMetaMuted}>Deadline  </Text>
+                  <Text style={styles.heroMetaBold}>{deadline}</Text>
+                </Text>
+              )}
+              {fallbackDue && (
                 <Text style={styles.heroMetaItem}>
                   <Text style={styles.heroMetaMuted}>Due  </Text>
-                  <Text style={styles.heroMetaBold}>{formatDate(task.dueDate)}</Text>
+                  <Text style={styles.heroMetaBold}>{fallbackDue}</Text>
                 </Text>
               )}
               {task.subtasksTotal > 0 && (
@@ -840,20 +872,26 @@ export default function TaskDetailScreen({ route, navigation }: Props) {
           </View>
 
           {/* Action bar */}
-          <View style={styles.heroActionBar}>
-            <TouchableOpacity
-              style={styles.heroActionBtn}
-              onPress={showStatusPicker}
-              disabled={updatingStatus}
-            >
-              {updatingStatus
-                ? <ActivityIndicator size="small" color="rgba(255,255,255,0.85)" />
-                : <Text style={styles.heroActionBtnText}>⚡ Change Status</Text>}
-            </TouchableOpacity>
-            <TouchableOpacity style={styles.heroDeleteBtn} onPress={handleDelete}>
-              <Text style={styles.heroDeleteBtnText}>🗑 Delete</Text>
-            </TouchableOpacity>
-          </View>
+          {(canUpdateTask || canDeleteTask) && (
+            <View style={styles.heroActionBar}>
+              {canUpdateTask && (
+                <TouchableOpacity
+                  style={styles.heroActionBtn}
+                  onPress={showStatusPicker}
+                  disabled={updatingStatus}
+                >
+                  {updatingStatus
+                    ? <ActivityIndicator size="small" color="rgba(255,255,255,0.85)" />
+                    : <Text style={styles.heroActionBtnText}>⚡ Change Status</Text>}
+                </TouchableOpacity>
+              )}
+              {canDeleteTask && (
+                <TouchableOpacity style={styles.heroDeleteBtn} onPress={handleDelete}>
+                  <Text style={styles.heroDeleteBtnText}>🗑 Delete</Text>
+                </TouchableOpacity>
+              )}
+            </View>
+          )}
         </View>
 
         {/* ── Vendor Consumption CTA ──────────────────────────────────── */}
@@ -883,21 +921,23 @@ export default function TaskDetailScreen({ route, navigation }: Props) {
 
         {/* ── Tabs ────────────────────────────────────────────────────── */}
         <View style={styles.tabBar}>
-          {(['details', 'subtasks', 'comments', 'activity', 'inventory'] as Tab[]).map((tab) => (
-            <TouchableOpacity
-              key={tab}
-              style={[styles.tab, activeTab === tab && styles.tabActive]}
-              onPress={() => setActiveTab(tab)}
-            >
-              <Text style={[styles.tabText, activeTab === tab && styles.tabTextActive]}>
-                {tab === 'details' ? 'Details'
-                  : tab === 'subtasks' ? `Subtasks${task.subtasksTotal > 0 ? ` (${task.subtasksCompleted}/${task.subtasksTotal})` : ''}`
-                  : tab === 'comments' ? `Comments${task.commentsCount > 0 ? ` (${task.commentsCount})` : ''}`
-                  : tab === 'inventory' ? 'Inventory'
-                  : 'Activity'}
-              </Text>
-            </TouchableOpacity>
-          ))}
+          {(['details', 'subtasks', 'comments', 'activity', 'inventory'] as Tab[])
+            .filter((t) => t !== 'inventory' || (permissions ? permissions.taskInventoryView : true))
+            .map((tab) => (
+              <TouchableOpacity
+                key={tab}
+                style={[styles.tab, activeTab === tab && styles.tabActive]}
+                onPress={() => setActiveTab(tab)}
+              >
+                <Text style={[styles.tabText, activeTab === tab && styles.tabTextActive]}>
+                  {tab === 'details' ? 'Details'
+                    : tab === 'subtasks' ? `Subtasks${task.subtasksTotal > 0 ? ` (${task.subtasksCompleted}/${task.subtasksTotal})` : ''}`
+                    : tab === 'comments' ? `Comments${task.commentsCount > 0 ? ` (${task.commentsCount})` : ''}`
+                    : tab === 'inventory' ? 'Inventory'
+                    : 'Activity'}
+                </Text>
+              </TouchableOpacity>
+            ))}
         </View>
 
         {/* ── Tab Content ─────────────────────────────────────────────── */}
@@ -917,26 +957,42 @@ export default function TaskDetailScreen({ route, navigation }: Props) {
                 <Text style={styles.sectionTitle}>Details</Text>
                 <MetaRow label="Status" value={task.status.replace('_', ' ')} />
                 <MetaRow label="Priority" value={task.priority} />
-                <MetaRow label="Due Date" value={formatDate(task.dueDate)} />
-                <TouchableOpacity onPress={() => setShowReassignPicker(true)} disabled={reassigning}>
-                  <View style={styles.metaRow}>
-                    <Text style={styles.metaLabel}>Assigned To</Text>
-                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, flex: 1, justifyContent: 'flex-end' }}>
-                      {reassigning
-                        ? <ActivityIndicator size="small" color="#006a66" />
-                        : <Text style={[styles.metaValue, { color: '#006a66', textDecorationLine: 'underline' }]}>
-                            {task.assignedTo?.name ?? 'Unassigned'}
-                          </Text>}
-                      <Text style={{ fontSize: 10, color: '#9aa0a6' }}>✎</Text>
+                {task.startDate && <MetaRow label="Start Date" value={formatDate(task.startDate)} />}
+                {task.endDate && <MetaRow label="Deadline" value={formatDate(task.endDate)} />}
+                {(!task.startDate && !task.endDate) && <MetaRow label="Due Date" value={formatDate(task.dueDate)} />}
+                {task.customer && <MetaRow label="Customer" value={task.customer} />}
+                {canUpdateTask ? (
+                  <TouchableOpacity onPress={() => setShowReassignPicker(true)} disabled={reassigning}>
+                    <View style={styles.metaRow}>
+                      <Text style={styles.metaLabel}>Assigned To</Text>
+                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, flex: 1, justifyContent: 'flex-end' }}>
+                        {reassigning
+                          ? <ActivityIndicator size="small" color="#006a66" />
+                          : <Text style={[styles.metaValue, { color: '#006a66', textDecorationLine: 'underline' }]}>
+                              {task.assignedTo?.name ?? 'Unassigned'}
+                            </Text>}
+                        <Text style={{ fontSize: 10, color: '#9aa0a6' }}>✎</Text>
+                      </View>
                     </View>
-                  </View>
-                </TouchableOpacity>
+                  </TouchableOpacity>
+                ) : (
+                  <MetaRow label="Assigned To" value={task.assignedTo?.name ?? 'Unassigned'} />
+                )}
                 <MetaRow label="Created By" value={task.createdBy?.name ?? '—'} />
                 <MetaRow label="Created" value={formatDate(task.createdAt)} />
                 {task.updatedAt && <MetaRow label="Updated" value={formatDate(task.updatedAt)} />}
                 {task.completedAt && <MetaRow label="Completed" value={formatDate(task.completedAt)} />}
                 {task.categoryName && <MetaRow label="Category" value={task.categoryName} />}
                 {task.estimateHours != null && <MetaRow label="Estimate" value={`${task.estimateHours}h`} />}
+                {/* Dynamic Custom Fields */}
+                {customFieldsConfig.filter((cf) => cf.context === task.taskType).map((cf) => {
+                  const val = task.customFields?.[cf.id] ?? task.customFields?.[String(cf.id)] ?? task.customFields?.[cf.name]
+                  if (val === undefined || val === null || String(val).trim() === '') return null
+                  const label = cf.icon ? `${cf.icon} ${cf.name}` : cf.name
+                  return (
+                    <MetaRow key={cf.id} label={label} value={String(val)} />
+                  )
+                })}
               </View>
             </View>
           )}
@@ -966,10 +1022,10 @@ export default function TaskDetailScreen({ route, navigation }: Props) {
                   reassigningOwner={reassigningSubtask === sub.id}
                   notesCount={subtaskNotes[sub.id]?.length ?? 0}
                   expanded={false}
-                  onSetStatus={() => handleSetSubtaskStatus(sub.id, sub.status)}
+                  onSetStatus={canUpdateSubtask ? () => handleSetSubtaskStatus(sub.id, sub.status) : undefined}
                   onToggleNotes={() => handleToggleNotes(sub.id)}
-                  onDelete={() => handleDeleteSubtask(sub.id)}
-                  onReassignOwner={() => setSubtaskOwnerPicker({ subtaskId: sub.id, title: sub.title, currentOwnerId: sub.ownerId ?? undefined })}
+                  onDelete={canDeleteSubtask ? () => handleDeleteSubtask(sub.id) : undefined}
+                  onReassignOwner={canUpdateSubtask ? () => setSubtaskOwnerPicker({ subtaskId: sub.id, title: sub.title, currentOwnerId: sub.ownerId ?? undefined }) : undefined}
                 />
               ))}
               {task.subtasks.length === 0 && (
@@ -977,7 +1033,8 @@ export default function TaskDetailScreen({ route, navigation }: Props) {
               )}
 
               {/* Add subtask */}
-              <View style={{ gap: 6 }}>
+              {canCreateSubtask && (
+                <View style={{ gap: 6 }}>
                 <View style={styles.addRow}>
                   <TextInput
                     style={styles.addInput}
@@ -1168,7 +1225,8 @@ export default function TaskDetailScreen({ route, navigation }: Props) {
                     </View>
                   </Modal>
                 )}
-              </View>
+                </View>
+              )}
             </View>
           )}
 
@@ -1254,7 +1312,7 @@ export default function TaskDetailScreen({ route, navigation }: Props) {
           )}
 
           {/* INVENTORY TAB */}
-          {activeTab === 'inventory' && (
+          {activeTab === 'inventory' && (permissions ? permissions.taskInventoryView : true) && (
             <InventorySection taskId={task.id} isAdmin={(currentUser?.role ?? '').toUpperCase().includes('ADMIN')} isSuperAdmin={(currentUser?.role ?? '').toUpperCase() === 'SUPER_ADMIN'} subtasks={task.subtasks ?? []} />
           )}
         </ScrollView>
@@ -1280,10 +1338,10 @@ function SubtaskRow({ subtask, settingStatus, reassigningOwner, notesCount, expa
   reassigningOwner: boolean
   notesCount: number
   expanded: boolean
-  onSetStatus: () => void
+  onSetStatus?: () => void
   onToggleNotes: () => void
-  onDelete: () => void
-  onReassignOwner: () => void
+  onDelete?: () => void
+  onReassignOwner?: () => void
 }) {
   const statusColor = SUBTASK_STATUS_COLORS[subtask.status] ?? '#c4c6cd'
   const statusIcon = subtask.status === 'DONE' ? '✅' : subtask.status === 'IN_PROGRESS' ? '🔄' : '⬜'
@@ -1292,7 +1350,7 @@ function SubtaskRow({ subtask, settingStatus, reassigningOwner, notesCount, expa
     <View style={[styles.subtaskRow, expanded && styles.subtaskRowExpanded]}>
 
       {/* Left: status icon — tap to change status */}
-      <TouchableOpacity onPress={onSetStatus} disabled={settingStatus} style={styles.subtaskStatusBtn}>
+      <TouchableOpacity onPress={onSetStatus} disabled={settingStatus || !onSetStatus} style={styles.subtaskStatusBtn}>
         {settingStatus
           ? <ActivityIndicator size="small" color={statusColor} />
           : <Text style={{ fontSize: 20 }}>{statusIcon}</Text>}
@@ -1307,19 +1365,30 @@ function SubtaskRow({ subtask, settingStatus, reassigningOwner, notesCount, expa
         >
           {subtask.title}
         </Text>
-        <TouchableOpacity onPress={onReassignOwner} disabled={reassigningOwner} style={{ marginTop: 2 }}>
-          {reassigningOwner
-            ? <ActivityIndicator size="small" color="#006a66" />
-            : subtask.ownerName
-              ? <View style={styles.subtaskOwnerRow}>
-                  <View style={styles.subtaskOwnerAvatar}>
-                    <Text style={styles.subtaskOwnerAvatarText}>{subtask.ownerName.charAt(0).toUpperCase()}</Text>
+        {onReassignOwner ? (
+          <TouchableOpacity onPress={onReassignOwner} disabled={reassigningOwner} style={{ marginTop: 2 }}>
+            {reassigningOwner
+              ? <ActivityIndicator size="small" color="#006a66" />
+              : subtask.ownerName
+                ? <View style={styles.subtaskOwnerRow}>
+                    <View style={styles.subtaskOwnerAvatar}>
+                      <Text style={styles.subtaskOwnerAvatarText}>{subtask.ownerName.charAt(0).toUpperCase()}</Text>
+                    </View>
+                    <Text style={styles.subtaskOwnerName}>{subtask.ownerName}</Text>
+                    <Text style={styles.subtaskOwnerEdit}>✎</Text>
                   </View>
-                  <Text style={styles.subtaskOwnerName}>{subtask.ownerName}</Text>
-                  <Text style={styles.subtaskOwnerEdit}>✎</Text>
-                </View>
-              : <Text style={styles.subtaskOwnerEmpty}>+ assign owner</Text>}
-        </TouchableOpacity>
+                : <Text style={styles.subtaskOwnerEmpty}>+ assign owner</Text>}
+          </TouchableOpacity>
+        ) : (
+          subtask.ownerName ? (
+            <View style={[styles.subtaskOwnerRow, { marginTop: 2 }]}>
+              <View style={styles.subtaskOwnerAvatar}>
+                <Text style={styles.subtaskOwnerAvatarText}>{subtask.ownerName.charAt(0).toUpperCase()}</Text>
+              </View>
+              <Text style={styles.subtaskOwnerName}>{subtask.ownerName}</Text>
+            </View>
+          ) : null
+        )}
 
         {/* Meta chips: start date / end date / estimate / completed */}
         {(subtask.startDate || subtask.endDate || subtask.estimatedMinutes || (subtask.completedAt && subtask.status === 'DONE')) && (
@@ -1373,9 +1442,11 @@ function SubtaskRow({ subtask, settingStatus, reassigningOwner, notesCount, expa
         <TouchableOpacity onPress={onToggleNotes} style={styles.subtaskNotesBtn}>
           <Text style={styles.subtaskNotesBtnText}>Open ›{notesCount > 0 ? `  💬 ${notesCount}` : ''}</Text>
         </TouchableOpacity>
-        <TouchableOpacity onPress={onDelete} style={styles.subtaskDelBtn}>
-          <Text style={styles.subtaskDelText}>✕</Text>
-        </TouchableOpacity>
+        {onDelete && (
+          <TouchableOpacity onPress={onDelete} style={styles.subtaskDelBtn}>
+            <Text style={styles.subtaskDelText}>✕</Text>
+          </TouchableOpacity>
+        )}
       </View>
 
     </View>

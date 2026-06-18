@@ -37,7 +37,13 @@ type Nav = NativeStackNavigationProp<RootStackParamList>
 
 function TaskCard({ task }: { task: Task }) {
   const navigation = useNavigation<Nav>()
-  const due = task.dueDate
+  const start = task.startDate
+    ? new Date(task.startDate).toLocaleDateString('en', { day: 'numeric', month: 'short' })
+    : null
+  const deadline = task.endDate
+    ? new Date(task.endDate).toLocaleDateString('en', { day: 'numeric', month: 'short', year: 'numeric' })
+    : null
+  const fallbackDue = !start && !deadline && task.dueDate
     ? new Date(task.dueDate).toLocaleDateString('en', { day: 'numeric', month: 'short', year: 'numeric' })
     : null
 
@@ -54,7 +60,9 @@ function TaskCard({ task }: { task: Task }) {
       <View style={styles.cardMeta}>
         <View style={[styles.priorityDot, { backgroundColor: PRIORITY_COLORS[task.priority] ?? '#999' }]} />
         <Text style={styles.metaText}>{task.priority}</Text>
-        {due && <Text style={[styles.metaText, { marginLeft: 12 }]}>Due {due}</Text>}
+        {start && <Text style={[styles.metaText, { marginLeft: 12 }]}>Start: {start}</Text>}
+        {deadline && <Text style={[styles.metaText, { marginLeft: 12 }]}>Deadline: {deadline}</Text>}
+        {fallbackDue && <Text style={[styles.metaText, { marginLeft: 12 }]}>Due {fallbackDue}</Text>}
       </View>
       {task.assignedTo && (
         <Text style={styles.assignee}>👤 {task.assignedTo.name}</Text>
@@ -67,8 +75,11 @@ export default function TaskListScreen() {
   const dispatch = useAppDispatch()
   const navigation = useNavigation<Nav>()
   const { tasks, loading } = useAppSelector((s) => s.tasks)
+  const permissions = useAppSelector((s) => s.auth.permissions)
   const [filter, setFilter] = useState<TaskStatus | 'ALL'>('ALL')
   const [search, setSearch] = useState('')
+
+  const canCreateTask = permissions ? permissions.taskCreate : true
 
   const load = useCallback(() => { dispatch(fetchTasks()) }, [dispatch])
   useEffect(() => { load() }, [load])
@@ -148,9 +159,11 @@ export default function TaskListScreen() {
       />
 
       {/* FAB */}
-      <TouchableOpacity style={styles.fab} onPress={() => navigation.navigate('CreateTask')}>
-        <Text style={styles.fabText}>+</Text>
-      </TouchableOpacity>
+      {canCreateTask && (
+        <TouchableOpacity style={styles.fab} onPress={() => navigation.navigate('CreateTask')}>
+          <Text style={styles.fabText}>+</Text>
+        </TouchableOpacity>
+      )}
     </SafeAreaView>
   )
 }

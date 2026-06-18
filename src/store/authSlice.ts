@@ -1,10 +1,13 @@
 import { createSlice, createAsyncThunk, PayloadAction } from '@reduxjs/toolkit'
 import { authService } from '../services/authService'
-import type { AuthResponse, LoginRequest } from '../types'
+import { permissionTemplateService } from '../services/permissionTemplateService'
+import type { AuthResponse, LoginRequest, EffectivePermissions } from '../types'
+import AsyncStorage from '@react-native-async-storage/async-storage'
 
 interface AuthState {
   token: string | null
   user: AuthResponse | null
+  permissions: EffectivePermissions | null
   loading: boolean
   error: string | null
 }
@@ -12,6 +15,7 @@ interface AuthState {
 const initialState: AuthState = {
   token: null,
   user: null,
+  permissions: null,
   loading: false,
   error: null,
 }
@@ -20,7 +24,15 @@ export const login = createAsyncThunk(
   'auth/login',
   async (data: LoginRequest, { rejectWithValue }) => {
     try {
-      return await authService.login(data)
+      const user = await authService.login(data)
+      let permissions: EffectivePermissions | null = null
+      try {
+        permissions = await permissionTemplateService.getEffectivePermissions(user.userId)
+        await AsyncStorage.setItem('auth_permissions', JSON.stringify(permissions))
+      } catch (err) {
+        console.warn('Failed to fetch permissions during login', err)
+      }
+      return { user, permissions }
     } catch (e: any) {
       return rejectWithValue(e.message)
     }
@@ -28,7 +40,24 @@ export const login = createAsyncThunk(
 )
 
 export const restoreSession = createAsyncThunk('auth/restoreSession', async () => {
-  return await authService.getStoredUser()
+  const user = await authService.getStoredUser()
+  if (user) {
+    let permissions: EffectivePermissions | null = null
+    try {
+      permissions = await permissionTemplateService.getEffectivePermissions(user.userId)
+      await AsyncStorage.setItem('auth_permissions', JSON.stringify(permissions))
+    } catch (err) {
+      // Offline fallback
+      try {
+        const cached = await AsyncStorage.getItem('auth_permissions')
+        if (cached) permissions = JSON.parse(cached)
+      } catch (cacheErr) {
+        console.warn('Failed to parse cached permissions', cacheErr)
+      }
+    }
+    return { user, permissions }
+  }
+  return null
 })
 
 const authSlice = createSlice({
@@ -38,6 +67,7 @@ const authSlice = createSlice({
     logout(state) {
       state.token = null
       state.user = null
+      state.permissions = null
       authService.logout()
     },
   },
@@ -47,10 +77,11 @@ const authSlice = createSlice({
         state.loading = true
         state.error = null
       })
-      .addCase(login.fulfilled, (state, action: PayloadAction<AuthResponse>) => {
+      .addCase(login.fulfilled, (state, action: PayloadAction<{ user: AuthResponse; permissions: EffectivePermissions | null }>) => {
         state.loading = false
-        state.token = action.payload.token
-        state.user = action.payload
+        state.token = action.payload.user.token
+        state.user = action.payload.user
+        state.permissions = action.payload.permissions
       })
       .addCase(login.rejected, (state, action) => {
         state.loading = false
@@ -58,8 +89,9 @@ const authSlice = createSlice({
       })
       .addCase(restoreSession.fulfilled, (state, action) => {
         if (action.payload) {
-          state.token = action.payload.token
-          state.user = action.payload
+          state.token = action.payload.user.token
+          state.user = action.payload.user
+          state.permissions = action.payload.permissions
         }
       })
   },

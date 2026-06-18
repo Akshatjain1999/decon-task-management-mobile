@@ -19,6 +19,8 @@ import * as Sharing from 'expo-sharing'
 import AsyncStorage from '@react-native-async-storage/async-storage'
 import { API_BASE_URL } from '../services/api'
 import { taskService } from '../services/taskService'
+import { subtaskApprovalService, type SubtaskStatusRequestResponse } from '../services/vendorService'
+import { useAppSelector } from '../store/hooks'
 import DateTimePicker, { type DateTimePickerEvent } from '@react-native-community/datetimepicker'
 import type { Subtask, SubtaskNote, SubtaskStatus, User } from '../types'
 
@@ -99,6 +101,14 @@ export default function SubtaskDetailSheet({
 }: Props) {
   const [tab, setTab] = useState<'details' | 'notes'>('details')
 
+  // Redux-based role and template permissions
+  const role = useAppSelector((s) => s.auth.user?.role)
+  const isVendor = role === 'VENDOR'
+  const permissions = useAppSelector((s) => s.auth.permissions)
+
+  const canEditSubtask = permissions ? permissions.subtaskUpdate : isAdmin
+  const canDeleteSubtask = permissions ? permissions.subtaskDelete : isAdmin
+
   // Editable fields
   const [title, setTitle] = useState('')
   const [editingTitle, setEditingTitle] = useState(false)
@@ -123,6 +133,12 @@ export default function SubtaskDetailSheet({
   const [estimateInput, setEstimateInput] = useState('')
   const [editingEstimate, setEditingEstimate] = useState(false)
 
+  // Status Request (Vendor Approvals) state
+  const [statusRequests, setStatusRequests] = useState<SubtaskStatusRequestResponse[]>([])
+  const [requestingStatus, setRequestingStatus] = useState<SubtaskStatus | null>(null)
+  const [requestNote, setRequestNote] = useState('')
+  const [submittingRequest, setSubmittingRequest] = useState(false)
+
   // Notes
   const [notes, setNotes] = useState<SubtaskNote[]>([])
   const [notesLoading, setNotesLoading] = useState(false)
@@ -137,6 +153,15 @@ export default function SubtaskDetailSheet({
   const [mentionTrigger, setMentionTrigger] = useState<{ start: number; query: string } | null>(null)
   const [pendingMentionIds, setPendingMentionIds] = useState<number[]>([])
   const noteInputRef = useRef<TextInput>(null)
+
+  const loadStatusRequests = useCallback(async () => {
+    try {
+      const list = await subtaskApprovalService.list(subtask.id)
+      setStatusRequests(list)
+    } catch (err) {
+      // noop
+    }
+  }, [subtask.id])
 
   // Reset state when subtask changes / sheet opens
   useEffect(() => {
@@ -157,7 +182,8 @@ export default function SubtaskDetailSheet({
     setPendingMentionIds([])
     setMentionTrigger(null)
     setNotes([])
-  }, [visible, subtask.id])
+    loadStatusRequests()
+  }, [visible, subtask.id, loadStatusRequests])
 
   // Load notes when notes tab opens
   useEffect(() => {
@@ -212,6 +238,10 @@ export default function SubtaskDetailSheet({
   const setStatus = async (status: SubtaskStatus) => {
     setShowStatusPicker(false)
     if (status === subtask.status) return
+    if (isVendor) {
+      setRequestingStatus(status)
+      return
+    }
     setSavingStatus(true)
     try {
       const updated = await taskService.setSubtaskStatus(taskId, subtask.id, status)
@@ -263,6 +293,38 @@ export default function SubtaskDetailSheet({
       onClose()
     } catch (e: any) {
       showToast(e?.message || 'Failed to delete subtask')
+    }
+  }
+
+  const submitStatusRequest = async () => {
+    if (!requestingStatus) return
+    setSubmittingRequest(true)
+    try {
+      await subtaskApprovalService.request(subtask.id, requestingStatus, requestNote || undefined)
+      setRequestingStatus(null)
+      setRequestNote('')
+      await loadStatusRequests()
+      showToast('Status change requested. Awaiting approval.')
+    } catch (e: any) {
+      showToast(e.message || 'Failed to request status change')
+    } finally {
+      setSubmittingRequest(false)
+    }
+  }
+
+  const decideStatusRequest = async (req: SubtaskStatusRequestResponse, approve: boolean) => {
+    try {
+      if (approve) {
+        await subtaskApprovalService.approve(req.id)
+        showToast('Request approved')
+        onUpdated({ ...subtask, status: req.requestedStatus as SubtaskStatus, isComplete: req.requestedStatus === 'DONE' })
+      } else {
+        await subtaskApprovalService.reject(req.id)
+        showToast('Request rejected')
+      }
+      await loadStatusRequests()
+    } catch (e: any) {
+      showToast(e.message || 'Failed to update request')
     }
   }
 
@@ -377,13 +439,10 @@ export default function SubtaskDetailSheet({
         <TouchableOpacity style={styles.dismissArea} activeOpacity={1} onPress={onClose} />
 
         <View style={styles.sheet}>
-          {/* Drag handle */}
-          <View style={styles.handle} />
-
           {/* Header */}
           <View style={styles.header}>
             <View style={{ flex: 1, paddingRight: 8 }}>
-              {editingTitle && isAdmin ? (
+              {editingTitle && canEditSubtask ? (
                 <TextInput
                   style={styles.titleInput}
                   value={title}
@@ -394,9 +453,9 @@ export default function SubtaskDetailSheet({
                   onSubmitEditing={saveTitle}
                 />
               ) : (
-                <TouchableOpacity onPress={() => isAdmin && setEditingTitle(true)} disabled={!isAdmin}>
+                <TouchableOpacity onPress={() => canEditSubtask && setEditingTitle(true)} disabled={!canEditSubtask}>
                   <Text style={styles.title} numberOfLines={3}>{subtask.title}</Text>
-                  {isAdmin && <Text style={styles.editHint}>Tap to edit</Text>}
+                  {canEditSubtask && <Text style={styles.editHint}>Tap to edit</Text>}
                 </TouchableOpacity>
               )}
             </View>
@@ -425,8 +484,8 @@ export default function SubtaskDetailSheet({
                   <Text style={styles.label}>Status</Text>
                   <TouchableOpacity
                     style={styles.fieldRow}
-                    onPress={() => isAdmin && setShowStatusPicker(true)}
-                    disabled={!isAdmin || savingStatus}
+                    onPress={() => (canEditSubtask || isVendor) && setShowStatusPicker(true)}
+                    disabled={(!canEditSubtask && !isVendor) || savingStatus}
                   >
                     <View style={[styles.statusPill, { backgroundColor: statusMeta.bg }]}>
                       <View style={[styles.statusDot, { backgroundColor: statusMeta.dot }]} />
@@ -434,17 +493,82 @@ export default function SubtaskDetailSheet({
                     </View>
                     {savingStatus
                       ? <ActivityIndicator size="small" color={C.primary} />
-                      : isAdmin && <Text style={styles.chevron}>›</Text>}
+                      : (canEditSubtask || isVendor) && <Text style={styles.chevron}>›</Text>}
                   </TouchableOpacity>
                 </View>
+
+                {/* Vendor Request Panel */}
+                {isVendor && requestingStatus && (
+                  <View style={styles.requestBox}>
+                    <Text style={styles.requestTitle}>Request Status → {requestingStatus}</Text>
+                    <TextInput
+                      style={styles.requestInput}
+                      value={requestNote}
+                      onChangeText={setRequestNote}
+                      placeholder="Optional note for approval..."
+                      placeholderTextColor={C.faint}
+                    />
+                    <View style={styles.requestButtons}>
+                      <TouchableOpacity
+                        style={styles.requestCancel}
+                        onPress={() => { setRequestingStatus(null); setRequestNote('') }}
+                      >
+                        <Text style={styles.requestCancelText}>Cancel</Text>
+                      </TouchableOpacity>
+                      <TouchableOpacity
+                        style={styles.requestSubmit}
+                        onPress={submitStatusRequest}
+                        disabled={submittingRequest}
+                      >
+                        {submittingRequest ? <ActivityIndicator size="small" color="#fff" /> : <Text style={styles.requestSubmitText}>Submit Request</Text>}
+                      </TouchableOpacity>
+                    </View>
+                  </View>
+                )}
+
+                {/* Status Requests History & Approvals */}
+                {statusRequests.length > 0 && (
+                  <View style={styles.requestsSection}>
+                    <Text style={styles.requestsSectionTitle}>Approval Requests</Text>
+                    {statusRequests.map((r) => (
+                      <View key={r.id} style={styles.requestRow}>
+                        <View style={{ flex: 1 }}>
+                          <Text style={styles.requestText}>
+                            {r.requestedByUserName} requested <Text style={{ fontWeight: '700' }}>{r.requestedStatus}</Text>
+                          </Text>
+                          {r.note ? <Text style={styles.requestNote}>"{r.note}"</Text> : null}
+                          <Text style={styles.requestMeta}>
+                            {timeAgo(r.requestedAt)} · Status: <Text style={{ fontWeight: '700', color: r.status === 'APPROVED' ? '#006a66' : r.status === 'REJECTED' ? C.danger : '#e65100' }}>{r.status}</Text>
+                          </Text>
+                        </View>
+                        {!isVendor && r.status === 'PENDING' && (
+                          <View style={styles.approvalButtons}>
+                            <TouchableOpacity
+                              style={styles.approveBtn}
+                              onPress={() => decideStatusRequest(r, true)}
+                            >
+                              <Text style={styles.approveBtnText}>Approve</Text>
+                            </TouchableOpacity>
+                            <TouchableOpacity
+                              style={styles.rejectBtn}
+                              onPress={() => decideStatusRequest(r, false)}
+                            >
+                              <Text style={styles.rejectBtnText}>Reject</Text>
+                            </TouchableOpacity>
+                          </View>
+                        )}
+                      </View>
+                    ))}
+                  </View>
+                )}
 
                 {/* Owner */}
                 <View>
                   <Text style={styles.label}>Owner</Text>
                   <TouchableOpacity
                     style={styles.fieldRow}
-                    onPress={() => isAdmin && setShowOwnerPicker(true)}
-                    disabled={!isAdmin || savingOwner}
+                    onPress={() => canEditSubtask && setShowOwnerPicker(true)}
+                    disabled={!canEditSubtask || savingOwner}
                   >
                     <View style={styles.ownerInline}>
                       <View style={styles.avatar}>
@@ -454,7 +578,7 @@ export default function SubtaskDetailSheet({
                     </View>
                     {savingOwner
                       ? <ActivityIndicator size="small" color={C.primary} />
-                      : isAdmin && <Text style={styles.chevron}>›</Text>}
+                      : canEditSubtask && <Text style={styles.chevron}>›</Text>}
                   </TouchableOpacity>
                 </View>
 
@@ -463,17 +587,17 @@ export default function SubtaskDetailSheet({
                   <Text style={styles.label}>Start date</Text>
                   <TouchableOpacity
                     style={styles.fieldRow}
-                    onPress={() => isAdmin && setEditingStart(true)}
-                    disabled={!isAdmin || savingStart}
+                    onPress={() => canEditSubtask && setEditingStart(true)}
+                    disabled={!canEditSubtask || savingStart}
                   >
                     <Text style={[styles.fieldValue, !subtask.startDate && { color: C.faint }]}>
                       {subtask.startDate ? formatDate(subtask.startDate) : 'Not set'}
                     </Text>
                     {savingStart
                       ? <ActivityIndicator size="small" color={C.primary} />
-                      : isAdmin && <Text style={styles.chevron}>›</Text>}
+                      : canEditSubtask && <Text style={styles.chevron}>›</Text>}
                   </TouchableOpacity>
-                  {editingStart && isAdmin && Platform.OS === 'android' && (
+                  {editingStart && canEditSubtask && Platform.OS === 'android' && (
                     <DateTimePicker
                       value={startInput ? new Date(startInput) : new Date()}
                       mode="date"
@@ -488,7 +612,7 @@ export default function SubtaskDetailSheet({
                       }}
                     />
                   )}
-                  {editingStart && isAdmin && Platform.OS === 'ios' && (
+                  {editingStart && canEditSubtask && Platform.OS === 'ios' && (
                     <Modal visible transparent animationType="slide" onRequestClose={() => setEditingStart(false)}>
                       <TouchableOpacity style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.45)' }} activeOpacity={1} onPress={() => setEditingStart(false)} />
                       <View style={{ backgroundColor: '#fff', paddingBottom: 30, borderTopLeftRadius: 20, borderTopRightRadius: 20 }}>
@@ -531,17 +655,17 @@ export default function SubtaskDetailSheet({
                   <Text style={styles.label}>End date</Text>
                   <TouchableOpacity
                     style={styles.fieldRow}
-                    onPress={() => isAdmin && setEditingEnd(true)}
-                    disabled={!isAdmin || savingEnd}
+                    onPress={() => canEditSubtask && setEditingEnd(true)}
+                    disabled={!canEditSubtask || savingEnd}
                   >
                     <Text style={[styles.fieldValue, !subtask.endDate && { color: C.faint }]}>
                       {subtask.endDate ? formatDate(subtask.endDate) : 'Not set'}
                     </Text>
                     {savingEnd
                       ? <ActivityIndicator size="small" color={C.primary} />
-                      : isAdmin && <Text style={styles.chevron}>›</Text>}
+                      : canEditSubtask && <Text style={styles.chevron}>›</Text>}
                   </TouchableOpacity>
-                  {editingEnd && isAdmin && Platform.OS === 'android' && (
+                  {editingEnd && canEditSubtask && Platform.OS === 'android' && (
                     <DateTimePicker
                       value={endInput ? new Date(endInput) : new Date()}
                       mode="date"
@@ -556,7 +680,7 @@ export default function SubtaskDetailSheet({
                       }}
                     />
                   )}
-                  {editingEnd && isAdmin && Platform.OS === 'ios' && (
+                  {editingEnd && canEditSubtask && Platform.OS === 'ios' && (
                     <Modal visible transparent animationType="slide" onRequestClose={() => setEditingEnd(false)}>
                       <TouchableOpacity style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.45)' }} activeOpacity={1} onPress={() => setEditingEnd(false)} />
                       <View style={{ backgroundColor: '#fff', paddingBottom: 30, borderTopLeftRadius: 20, borderTopRightRadius: 20 }}>
@@ -597,7 +721,7 @@ export default function SubtaskDetailSheet({
                 {/* Estimate */}
                 <View>
                   <Text style={styles.label}>Estimate (hours)</Text>
-                  {editingEstimate && isAdmin ? (
+                  {editingEstimate && canEditSubtask ? (
                     <View style={styles.fieldRow}>
                       <TextInput
                         style={styles.inlineInput}
@@ -615,13 +739,13 @@ export default function SubtaskDetailSheet({
                   ) : (
                     <TouchableOpacity
                       style={styles.fieldRow}
-                      onPress={() => isAdmin && setEditingEstimate(true)}
-                      disabled={!isAdmin}
+                      onPress={() => canEditSubtask && setEditingEstimate(true)}
+                      disabled={!canEditSubtask}
                     >
                       <Text style={[styles.fieldValue, subtask.estimatedMinutes == null && { color: C.faint }]}>
                         {subtask.estimatedMinutes != null ? `${(subtask.estimatedMinutes / 60).toFixed(2).replace(/\.00$/, '').replace(/0$/, '')}h` : 'Not set'}
                       </Text>
-                      {isAdmin && <Text style={styles.chevron}>›</Text>}
+                      {canEditSubtask && <Text style={styles.chevron}>›</Text>}
                     </TouchableOpacity>
                   )}
                 </View>
@@ -630,7 +754,7 @@ export default function SubtaskDetailSheet({
                 <View>
                   <View style={styles.descHeader}>
                     <Text style={styles.label}>Description</Text>
-                    {isAdmin && !editingDesc && (
+                    {canEditSubtask && !editingDesc && (
                       <TouchableOpacity onPress={() => setEditingDesc(true)}>
                         <Text style={styles.editLink}>{subtask.description ? 'Edit' : 'Add'}</Text>
                       </TouchableOpacity>
@@ -667,7 +791,7 @@ export default function SubtaskDetailSheet({
                 </View>
 
                 {/* Delete */}
-                {canDelete && (
+                {canDeleteSubtask && (
                   <TouchableOpacity style={styles.deleteBtn} onPress={() => setConfirmDeleteSubtask(true)}>
                     <Text style={styles.deleteBtnText}>Delete subtask</Text>
                   </TouchableOpacity>
@@ -1004,4 +1128,126 @@ const styles = StyleSheet.create({
   confirmTitle: { fontSize: 16, fontWeight: '700', color: C.text, marginBottom: 4 },
   confirmBody: { fontSize: 13, color: C.muted, marginBottom: 18 },
   confirmActions: { flexDirection: 'row', justifyContent: 'flex-end', gap: 8 },
+
+  requestBox: {
+    backgroundColor: '#fff4ec',
+    borderWidth: 1,
+    borderColor: '#ffd7b5',
+    borderRadius: 10,
+    padding: 12,
+    marginTop: 8,
+    gap: 8,
+  },
+  requestTitle: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: '#a05a00',
+  },
+  requestInput: {
+    backgroundColor: '#fff',
+    borderWidth: 1,
+    borderColor: '#ffd7b5',
+    borderRadius: 8,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    fontSize: 13,
+    color: C.text,
+  },
+  requestButtons: {
+    flexDirection: 'row',
+    justifyContent: 'flex-end',
+    gap: 8,
+  },
+  requestCancel: {
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 6,
+    borderWidth: 1,
+    borderColor: '#ffd7b5',
+  },
+  requestCancelText: {
+    fontSize: 12,
+    color: '#a05a00',
+    fontWeight: '600',
+  },
+  requestSubmit: {
+    backgroundColor: '#e65100',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 6,
+  },
+  requestSubmitText: {
+    fontSize: 12,
+    color: '#fff',
+    fontWeight: '700',
+  },
+  requestsSection: {
+    marginTop: 12,
+    backgroundColor: '#fafbfc',
+    borderWidth: 1,
+    borderColor: C.border,
+    borderRadius: 10,
+    padding: 12,
+  },
+  requestsSectionTitle: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: C.muted,
+    textTransform: 'uppercase',
+    letterSpacing: 0.4,
+    marginBottom: 8,
+  },
+  requestRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    paddingVertical: 8,
+    borderBottomWidth: 1,
+    borderBottomColor: '#f0f0f0',
+  },
+  requestText: {
+    fontSize: 13,
+    color: C.text,
+  },
+  requestNote: {
+    fontSize: 12,
+    color: C.muted,
+    fontStyle: 'italic',
+    marginTop: 2,
+  },
+  requestMeta: {
+    fontSize: 11,
+    color: C.faint,
+    marginTop: 2,
+  },
+  approvalButtons: {
+    flexDirection: 'row',
+    gap: 6,
+  },
+  approveBtn: {
+    backgroundColor: '#e6f7f6',
+    borderWidth: 1,
+    borderColor: '#006a66',
+    paddingHorizontal: 8,
+    paddingVertical: 6,
+    borderRadius: 6,
+  },
+  approveBtnText: {
+    fontSize: 11,
+    color: '#006a66',
+    fontWeight: '700',
+  },
+  rejectBtn: {
+    backgroundColor: '#fff0f0',
+    borderWidth: 1,
+    borderColor: C.danger,
+    paddingHorizontal: 8,
+    paddingVertical: 6,
+    borderRadius: 6,
+  },
+  rejectBtnText: {
+    fontSize: 11,
+    color: C.danger,
+    fontWeight: '700',
+  },
 })

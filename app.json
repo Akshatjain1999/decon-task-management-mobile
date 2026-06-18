@@ -20,7 +20,8 @@
     },
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.crm.decontaskmanager"
+      "bundleIdentifier": "com.crm.decontaskmanager",
+      "googleServicesFile": "./GoogleService-Info.plist"
     },
     "android": {
       "adaptiveIcon": {
@@ -29,12 +30,15 @@
       },
       "package": "com.crm.decontaskmanager",
       "edgeToEdgeEnabled": true,
-      "predictiveBackGestureEnabled": false
+      "predictiveBackGestureEnabled": false,
+      "googleServicesFile": "./google-services.json"
     },
     "web": {
       "favicon": "./assets/favicon.png"
     },
     "plugins": [
+      "@react-native-firebase/app",
+      "@react-native-firebase/messaging",
       "expo-sharing",
       [
         "expo-location",

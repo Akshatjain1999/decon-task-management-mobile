@@ -20,6 +20,10 @@ export interface User {
   role: string
   status: string
   createdAt: string
+  lastLatitude?: number | null
+  lastLongitude?: number | null
+  lastSeenAt?: string | null
+  userPermissionTemplateId?: number | null
 }
 
 // ─── Tag ───────────────────────────────────────────────────────────────────
@@ -48,17 +52,26 @@ export interface Subtask {
   endDate?: string | null                // ISO yyyy-MM-dd
   estimatedMinutes?: number | null
   subtaskKind?: 'NORMAL' | 'INSTALLATION' | 'LIVE'
+  notesCount?: number | null
+}
+
+export interface NoteAttachment {
+  id: number
+  name: string
+  type: string | null
+  size: number | null
 }
 
 export interface SubtaskNote {
   id: number
   note: string
-  createdBy: { id: number; name: string }
+  createdBy: { id: number; name: string; email?: string; role?: string }
   createdAt: string
   attachmentName?: string | null
   attachmentType?: string | null
   attachmentSize?: number | null
   hasAttachment: boolean
+  attachments?: NoteAttachment[]
 }
 
 // ─── Task ──────────────────────────────────────────────────────────────────
@@ -76,6 +89,8 @@ export interface Task {
   assignedTo: User | null
   createdBy: User
   dueDate: string
+  startDate?: string | null
+  endDate?: string | null
   estimateHours: number | null
   createdAt: string
   updatedAt: string | null
@@ -92,6 +107,8 @@ export interface Task {
   latitude?: number | null
   longitude?: number | null
   geofenceRadiusM?: number | null
+  customFields?: Record<string, any>
+  customer?: string | null
 }
 
 export interface CreateTaskRequest {
@@ -100,7 +117,16 @@ export interface CreateTaskRequest {
   description?: string
   priority: TaskPriority
   assignedToId?: number
-  dueDate: string
+  vendorOwnerId?: number
+  startDate?: string
+  dueDate?: string
+  categoryId?: number
+  tagIds?: number[]
+  latitude?: number
+  longitude?: number
+  geofenceRadiusM?: number
+  customFields?: Record<string, any>
+  customer?: string
 }
 
 export interface UpdateTaskRequest {
@@ -109,8 +135,16 @@ export interface UpdateTaskRequest {
   priority?: TaskPriority
   status?: TaskStatus
   assignedToId?: number
+  vendorOwnerId?: number | null
+  startDate?: string
   dueDate?: string
   estimateHours?: number
+  latitude?: number | null
+  longitude?: number | null
+  geofenceRadiusM?: number | null
+  tagIds?: number[]
+  customFields?: Record<string, any>
+  customer?: string | null
 }
 
 // ─── Comment ───────────────────────────────────────────────────────────────
@@ -210,12 +244,15 @@ export interface WccBillingStats {
   wccCompleted: number
   billingPending: number
   billingCompleted: number
-  /** L1: every subtask up to & including the L1 anchor ("WCC" for CCTV; "Live after installation done" for Lift/Racks) is DONE. */
+  /** L1: every subtask up to & including the L1 anchor ("Live" for CCTV; "Live after installation done" for Lift/Racks) is DONE. */
   l1Completed: number
+  l1NotCompleted: number
   /** L2: every subtask up to & including "Billing completed" is DONE. */
   l2Completed: number
+  l2NotCompleted: number
   /** L3: every subtask up to & including "Delivered pending material" is DONE. Null for Lift/Racks. */
   l3Completed: number | null
+  l3NotCompleted: number | null
 }
 
 export interface TaskTypeBreakdown {
@@ -388,3 +425,51 @@ export interface RecordMovementRequest {
   movementDate: string
   referenceSubtaskId?: number
 }
+
+// ─── Permission Templates ──────────────────────────────────────────────────
+export interface PermissionTemplate {
+  id: number
+  name: string
+  description: string | null
+  taskCreate: boolean
+  taskView: boolean
+  taskUpdate: boolean
+  taskUpdateFields: string[] | null
+  taskDelete: boolean
+  subtaskCreate: boolean
+  subtaskView: boolean
+  subtaskUpdate: boolean
+  subtaskUpdateFields: string[] | null
+  subtaskDelete: boolean
+  inventoryView: boolean
+  inventoryStockIn: boolean
+  inventoryManage: boolean
+  taskInventoryView: boolean
+  taskInventoryStockIn: boolean
+  taskInventoryManage: boolean
+  createdAt: string
+  updatedAt: string | null
+}
+
+export interface EffectivePermissions {
+  taskCreate: boolean
+  taskView: boolean
+  taskUpdate: boolean
+  taskUpdateFields: string[] | null
+  taskDelete: boolean
+  subtaskCreate: boolean
+  subtaskView: boolean
+  subtaskUpdate: boolean
+  subtaskUpdateFields: string[] | null
+  subtaskDelete: boolean
+  inventoryView: boolean
+  inventoryStockIn: boolean
+  inventoryManage: boolean
+  taskInventoryView: boolean
+  taskInventoryStockIn: boolean
+  taskInventoryManage: boolean
+  vendorViewOwn: boolean
+  vendorConsume: boolean
+  vendorRequestSubtask: boolean
+}
+

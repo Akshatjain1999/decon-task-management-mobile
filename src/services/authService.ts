@@ -16,6 +16,7 @@ export const authService = {
   async logout(): Promise<void> {
     await AsyncStorage.removeItem('auth_token')
     await AsyncStorage.removeItem('auth_user')
+    await AsyncStorage.removeItem('auth_permissions')
   },
 
   async getStoredUser(): Promise<AuthResponse | null> {

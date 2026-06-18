@@ -20,6 +20,7 @@ import type { RootStackParamList } from '../navigation/types'
 import { useAppDispatch } from '../store/hooks'
 import { createTask } from '../store/taskSlice'
 import { userService } from '../services/userService'
+import { customFieldService, type CustomField } from '../services/customFieldService'
 import type { TaskPriority, TaskType, CreateTaskRequest, User } from '../types'
 
 type Nav = NativeStackNavigationProp<RootStackParamList>
@@ -45,7 +46,7 @@ export default function CreateTaskScreen() {
   const [description, setDescription] = useState('')
   const [priority, setPriority] = useState<TaskPriority>('MEDIUM')
   const [taskType, setTaskType] = useState<TaskType>('CCTV_INSTALLATION')
-  const [dateObj, setDateObj] = useState<Date | null>(null)
+  const [dateObj, setDateObj] = useState<Date | null>(new Date()) // Default start date to today
   const [pendingDate, setPendingDate] = useState<Date>(new Date())
   const [showDatePicker, setShowDatePicker] = useState(false)
   const [assignedToId, setAssignedToId] = useState<number | null>(null)
@@ -59,13 +60,24 @@ export default function CreateTaskScreen() {
   const [loading, setLoading] = useState(false)
   const [errors, setErrors] = useState<Record<string, string>>({})
 
+  // Dynamic Custom Fields & Customer state
+  const [customFieldsConfig, setCustomFieldsConfig] = useState<CustomField[]>([])
+  const [customFields, setCustomFields] = useState<Record<string, any>>({})
+  const [customer, setCustomer] = useState('')
+
   useEffect(() => {
     setUsersLoading(true)
     userService.getAll()
       .then(setUsers)
       .catch(() => setUsers([]))
       .finally(() => setUsersLoading(false))
+
+    customFieldService.getAll()
+      .then(setCustomFieldsConfig)
+      .catch((err) => console.warn('Failed to load custom fields config', err))
   }, [])
+
+  const activeCustomFields = customFieldsConfig.filter((cf) => cf.context === taskType)
 
   const formatDate = (d: Date) =>
     `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
@@ -85,13 +97,12 @@ export default function CreateTaskScreen() {
 
   const confirmDateiOS = () => {
     setDateObj(pendingDate)
-    setErrors((e) => ({ ...e, dueDate: '' }))
+    setErrors((e) => ({ ...e, startDate: '' }))
     setShowDatePicker(false)
   }
 
   const cancelDateiOS = () => {
     setShowDatePicker(false)
-    // pendingDate is discarded — dateObj unchanged
   }
 
   // Android: fires once on confirm or dismiss
@@ -99,15 +110,22 @@ export default function CreateTaskScreen() {
     setShowDatePicker(false)
     if (event.type === 'set' && selected) {
       setDateObj(selected)
-      setErrors((e) => ({ ...e, dueDate: '' }))
+      setErrors((e) => ({ ...e, startDate: '' }))
     }
-    // type === 'dismissed' → user cancelled, dateObj unchanged
   }
 
   const validate = () => {
     const e: Record<string, string> = {}
     if (!title.trim()) e.title = 'Title is required.'
-    if (!dateObj) e.dueDate = 'Please select a due date.'
+    
+    // Validate required custom fields
+    activeCustomFields.forEach((cf) => {
+      const val = customFields[cf.id]
+      if (cf.required && (val === undefined || val === null || String(val).trim() === '')) {
+        e[`custom_${cf.id}`] = `${cf.name} is required.`
+      }
+    })
+
     setErrors(e)
     return Object.keys(e).length === 0
   }
@@ -120,7 +138,9 @@ export default function CreateTaskScreen() {
       priority,
       taskType,
       assignedToId: assignedToId ?? undefined,
-      dueDate: `${formatDate(dateObj!)}T00:00:00`,
+      startDate: dateObj ? `${formatDate(dateObj)}T00:00:00` : undefined,
+      customFields: Object.keys(customFields).length > 0 ? customFields : undefined,
+      customer: customer.trim() || undefined,
     }
     setLoading(true)
     try {
@@ -270,30 +290,30 @@ export default function CreateTaskScreen() {
             ) : null}
           </View>
 
-          {/* Due Date */}
+          {/* Start Date */}
           <View style={styles.section}>
-            <Text style={styles.label}>Due Date<Text style={styles.requiredMark}> *</Text></Text>
+            <Text style={styles.label}>Start Date</Text>
             <TouchableOpacity
               onPress={openDatePicker}
               activeOpacity={0.75}
-              style={[styles.pickerBtn, errors.dueDate ? styles.pickerBtnError : undefined]}
+              style={[styles.pickerBtn, errors.startDate ? styles.pickerBtnError : undefined]}
             >
-              <Text style={styles.dateIcon}>&#x1F4C5;</Text>
+              <Text style={styles.dateIcon}>📅</Text>
               <Text style={[styles.datePickerText, !dateObj && { color: '#9aa5b1' }]}>
-                {dateObj ? formatDisplay(dateObj) : 'Select a due date...'}
+                {dateObj ? formatDisplay(dateObj) : 'Select a start date...'}
               </Text>
               {dateObj ? (
                 <TouchableOpacity
                   onPress={() => setDateObj(null)}
                   hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
                 >
-                  <Text style={styles.dateClear}>&#x2715;</Text>
+                  <Text style={styles.dateClear}>✕</Text>
                 </TouchableOpacity>
               ) : (
-                <Text style={styles.pickerChevron}>&#x25BC;</Text>
+                <Text style={styles.pickerChevron}>▼</Text>
               )}
             </TouchableOpacity>
-            {errors.dueDate ? <Text style={styles.errorText}>{errors.dueDate}</Text> : null}
+            {errors.startDate ? <Text style={styles.errorText}>{errors.startDate}</Text> : null}
 
             {/* Android: shows system calendar dialog once */}
             {Platform.OS === 'android' && showDatePicker && (
@@ -326,7 +346,7 @@ export default function CreateTaskScreen() {
                   <TouchableOpacity onPress={cancelDateiOS} style={styles.dateSheetCancel}>
                     <Text style={styles.dateSheetCancelText}>Cancel</Text>
                   </TouchableOpacity>
-                  <Text style={styles.sheetTitle}>Select Due Date</Text>
+                  <Text style={styles.sheetTitle}>Select Start Date</Text>
                   <TouchableOpacity onPress={confirmDateiOS} style={styles.dateSheetDone}>
                     <Text style={styles.dateSheetDoneText}>Done</Text>
                   </TouchableOpacity>
@@ -342,6 +362,57 @@ export default function CreateTaskScreen() {
               </View>
             </Modal>
           )}
+
+          {/* Customer */}
+          <View style={styles.section}>
+            <Text style={styles.label}>Customer</Text>
+            <TextInput
+              style={styles.input}
+              value={customer}
+              onChangeText={setCustomer}
+              placeholder="e.g. Acme Corp"
+              placeholderTextColor="#9aa5b1"
+              maxLength={100}
+            />
+          </View>
+
+          {/* Dynamic Custom Fields */}
+          {activeCustomFields.map((field) => {
+            const hasError = errors[`custom_${field.id}`]
+            return (
+              <View key={field.id} style={styles.section}>
+                <Text style={styles.label}>
+                  {field.name}
+                  {field.required && <Text style={styles.requiredMark}> *</Text>}
+                </Text>
+                {field.fieldType === 'Number' ? (
+                  <TextInput
+                    style={[styles.input, hasError ? styles.inputError : undefined]}
+                    keyboardType="numeric"
+                    value={customFields[field.id] !== undefined ? String(customFields[field.id]) : ''}
+                    onChangeText={(v) => {
+                      setErrors((e) => ({ ...e, [`custom_${field.id}`]: '' }))
+                      setCustomFields({ ...customFields, [field.id]: v ? Number(v) : undefined })
+                    }}
+                    placeholder={`Enter ${field.name.toLowerCase()}...`}
+                    placeholderTextColor="#9aa5b1"
+                  />
+                ) : (
+                  <TextInput
+                    style={[styles.input, hasError ? styles.inputError : undefined]}
+                    value={customFields[field.id] || ''}
+                    onChangeText={(v) => {
+                      setErrors((e) => ({ ...e, [`custom_${field.id}`]: '' }))
+                      setCustomFields({ ...customFields, [field.id]: v })
+                    }}
+                    placeholder={`Enter ${field.name.toLowerCase()}...`}
+                    placeholderTextColor="#9aa5b1"
+                  />
+                )}
+                {hasError ? <Text style={styles.errorText}>{hasError}</Text> : null}
+              </View>
+            )
+          })}
 
           {/* Submit error */}
           {errors.submit ? (
