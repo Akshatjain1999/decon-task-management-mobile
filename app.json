@@ -29,7 +29,6 @@
       },
       "package": "com.crm.decontaskmanager",
       "versionCode": 1,
-      "googleServicesFile": "./google-services.json",
       "edgeToEdgeEnabled": true,
       "predictiveBackGestureEnabled": false
     },
