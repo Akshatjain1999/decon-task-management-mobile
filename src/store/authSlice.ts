@@ -2,7 +2,7 @@ import { createSlice, createAsyncThunk, PayloadAction } from '@reduxjs/toolkit'
 import { authService } from '../services/authService'
 import { permissionTemplateService } from '../services/permissionTemplateService'
 import type { AuthResponse, LoginRequest, EffectivePermissions } from '../types'
-import AsyncStorage from '@react-native-async-storage/async-storage'
+import { secureStorage } from '../lib/secureStorage'
 
 interface AuthState {
   token: string | null
@@ -28,7 +28,7 @@ export const login = createAsyncThunk(
       let permissions: EffectivePermissions | null = null
       try {
         permissions = await permissionTemplateService.getEffectivePermissions(user.userId)
-        await AsyncStorage.setItem('auth_permissions', JSON.stringify(permissions))
+        await secureStorage.setItem('auth_permissions', JSON.stringify(permissions))
       } catch (err) {
         console.warn('Failed to fetch permissions during login', err)
       }
@@ -45,11 +45,11 @@ export const restoreSession = createAsyncThunk('auth/restoreSession', async () =
     let permissions: EffectivePermissions | null = null
     try {
       permissions = await permissionTemplateService.getEffectivePermissions(user.userId)
-      await AsyncStorage.setItem('auth_permissions', JSON.stringify(permissions))
+      await secureStorage.setItem('auth_permissions', JSON.stringify(permissions))
     } catch (err) {
       // Offline fallback
       try {
-        const cached = await AsyncStorage.getItem('auth_permissions')
+        const cached = await secureStorage.getItem('auth_permissions')
         if (cached) permissions = JSON.parse(cached)
       } catch (cacheErr) {
         console.warn('Failed to parse cached permissions', cacheErr)

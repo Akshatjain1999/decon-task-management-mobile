@@ -1,5 +1,5 @@
 import axios from 'axios'
-import AsyncStorage from '@react-native-async-storage/async-storage'
+import { secureStorage } from '../lib/secureStorage'
 
 export const API_BASE_URL = 'https://decon-api.onrender.com'
 
@@ -22,9 +22,9 @@ const api = axios.create({
   timeout: 15000,
 })
 
-// Attach JWT from AsyncStorage on every request
+// Attach JWT from SecureStore on every request
 api.interceptors.request.use(async (config) => {
-  const token = await AsyncStorage.getItem('auth_token')
+  const token = await secureStorage.getItem('auth_token')
   if (token) {
     config.headers.Authorization = `Bearer ${token}`
   }
@@ -41,8 +41,8 @@ api.interceptors.response.use(
   },
   async (error) => {
     if (error.response?.status === 401) {
-      await AsyncStorage.removeItem('auth_token')
-      await AsyncStorage.removeItem('auth_user')
+      await secureStorage.removeItem('auth_token')
+      await secureStorage.removeItem('auth_user')
       // Fire once per expiry burst — many in-flight requests may all 401 at
       // the same time; we only want one redirect to Login.
       if (!expiredFired) {
@@ -55,7 +55,6 @@ api.interceptors.response.use(
     // Debug: log full error details to Metro console
     console.warn('[API ERROR]', {
       status: error.response?.status,
-      data: JSON.stringify(error.response?.data),
       message: error.message,
       code: error.code,
     })

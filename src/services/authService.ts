@@ -1,5 +1,5 @@
 import api from './api'
-import AsyncStorage from '@react-native-async-storage/async-storage'
+import { secureStorage } from '../lib/secureStorage'
 import type { AuthResponse, LoginRequest } from '../types'
 
 export const authService = {
@@ -7,20 +7,20 @@ export const authService = {
     const res = await api.post<AuthResponse>('/api/v1/auth/login', data)
     const user = res.data
     if (user?.token) {
-      await AsyncStorage.setItem('auth_token', user.token)
+      await secureStorage.setItem('auth_token', user.token)
     }
-    await AsyncStorage.setItem('auth_user', JSON.stringify(user))
+    await secureStorage.setItem('auth_user', JSON.stringify(user))
     return user
   },
 
   async logout(): Promise<void> {
-    await AsyncStorage.removeItem('auth_token')
-    await AsyncStorage.removeItem('auth_user')
-    await AsyncStorage.removeItem('auth_permissions')
+    await secureStorage.removeItem('auth_token')
+    await secureStorage.removeItem('auth_user')
+    await secureStorage.removeItem('auth_permissions')
   },
 
   async getStoredUser(): Promise<AuthResponse | null> {
-    const raw = await AsyncStorage.getItem('auth_user')
+    const raw = await secureStorage.getItem('auth_user')
     return raw ? (JSON.parse(raw) as AuthResponse) : null
   },
 }
