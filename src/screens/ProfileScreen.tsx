@@ -4,8 +4,14 @@ import { SafeAreaView } from 'react-native-safe-area-context'
 import { useAppDispatch, useAppSelector } from '../store/hooks'
 import { logout } from '../store/authSlice'
 import * as Updates from 'expo-updates'
+import { useNavigation } from '@react-navigation/native'
+import type { NativeStackNavigationProp } from '@react-navigation/native-stack'
+import type { RootStackParamList } from '../navigation/types'
+
+type Nav = NativeStackNavigationProp<RootStackParamList>
 
 export default function ProfileScreen() {
+  const navigation = useNavigation<Nav>()
   const dispatch = useAppDispatch()
   const user = useAppSelector((s) => s.auth.user)
   const [updateChecking, setUpdateChecking] = useState(false)
@@ -80,6 +86,13 @@ export default function ProfileScreen() {
         </Text>
       </TouchableOpacity>
 
+      <TouchableOpacity
+        style={styles.menuBtn}
+        onPress={() => (navigation as any).navigate('WorkRequests')}
+      >
+        <Text style={styles.menuBtnText}>📋  Work Requests</Text>
+      </TouchableOpacity>
+
       <TouchableOpacity style={styles.logoutBtn} onPress={handleLogout}>
         <Text style={styles.logoutText}>Sign Out</Text>
       </TouchableOpacity>
@@ -133,6 +146,17 @@ const styles = StyleSheet.create({
   updateBtnDisabled: { opacity: 0.6 },
   updateText: { color: '#006a66', fontWeight: '700', fontSize: 15 },
   updateTextDone: { color: '#2e7d32' },
+  menuBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    borderRadius: 12,
+    padding: 16,
+    marginBottom: 12,
+    borderWidth: 1,
+    borderColor: '#e8eaed',
+    backgroundColor: '#fff',
+  },
+  menuBtnText: { color: '#191c1e', fontWeight: '600', fontSize: 15 },
   logoutBtn: {
     backgroundColor: '#ba1a1a',
     borderRadius: 12,

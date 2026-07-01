@@ -83,3 +83,55 @@ export const subtaskApprovalService = {
     return (res.data as any).data ?? res.data
   },
 }
+
+// ── Consumption approval ──────────────────────────────────────────────────────
+
+export const consumptionApprovalService = {
+  async approve(consumptionId: number, note?: string): Promise<ConsumptionResponse> {
+    const res = await api.post(`/api/v1/consumption/${consumptionId}/approve`, { note })
+    return (res.data as any).data ?? res.data
+  },
+  async reject(consumptionId: number, note?: string): Promise<ConsumptionResponse> {
+    const res = await api.post(`/api/v1/consumption/${consumptionId}/reject`, { note })
+    return (res.data as any).data ?? res.data
+  },
+}
+
+// ── Work Requests ─────────────────────────────────────────────────────────────
+
+export interface WorkRequest {
+  id: number
+  vendorId: number | null
+  vendorName: string | null
+  vendorPhone: string | null
+  title: string
+  description: string | null
+  requestType: string
+  urgency: string
+  status: 'PENDING' | 'IN_REVIEW' | 'APPROVED' | 'REJECTED'
+  adminNote: string | null
+  resolvedById: number | null
+  resolvedByName: string | null
+  resolvedAt: string | null
+  createdAt: string
+  updatedAt: string
+}
+
+export const workRequestService = {
+  async createMy(payload: { title: string; description?: string; requestType: string; urgency: string }): Promise<WorkRequest> {
+    const res = await api.post('/api/v1/vendors/work-requests', payload)
+    return (res.data as any).data ?? res.data
+  },
+  async listMy(): Promise<WorkRequest[]> {
+    const res = await api.get('/api/v1/vendors/work-requests/my')
+    return (res.data as any).data ?? res.data
+  },
+  async listAll(): Promise<WorkRequest[]> {
+    const res = await api.get('/api/v1/vendors/work-requests')
+    return (res.data as any).data ?? res.data
+  },
+  async updateStatus(id: number, status: 'IN_REVIEW' | 'APPROVED' | 'REJECTED', adminNote?: string): Promise<WorkRequest> {
+    const res = await api.put(`/api/v1/vendors/work-requests/${id}/status`, { status, adminNote })
+    return (res.data as any).data ?? res.data
+  },
+}

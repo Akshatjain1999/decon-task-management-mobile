@@ -9,6 +9,7 @@ export type RootStackParamList = {
   TaskTypeDashboard: { typeKey: string }
   WorkflowDetail: { typeKey: string; filter: string }
   ConsumptionForm: { taskId: number }
+  WorkRequests: undefined
 }
 
 export type BottomTabParamList = {

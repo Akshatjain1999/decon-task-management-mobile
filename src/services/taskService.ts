@@ -29,7 +29,7 @@ export const taskService = {
   },
 
   async getMyTasks(userId: number): Promise<Task[]> {
-    const res = await api.get<Task[]>(`/api/v1/tasks/assignee/${userId}`)
+    const res = await api.get<Task[]>('/api/v1/tasks/my')
     return res.data
   },
 

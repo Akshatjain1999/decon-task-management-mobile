@@ -30,10 +30,11 @@ import { updateTask, fetchTasks } from '../store/taskSlice'
 import type { Task, TaskStatus, Comment, TaskAuditsResponse, Subtask, SubtaskNote, SubtaskStatus, User } from '../types'
 import SubtaskDetailSheet from '../components/SubtaskDetailSheet'
 import InventorySection from '../components/InventorySection'
+import { vendorBucketService, consumptionApprovalService, type ConsumptionResponse } from '../services/vendorService'
 import DateTimePicker, { type DateTimePickerEvent } from '@react-native-community/datetimepicker'
 
 type Props = NativeStackScreenProps<RootStackParamList, 'TaskDetail'>
-type Tab = 'details' | 'subtasks' | 'comments' | 'activity' | 'inventory'
+type Tab = 'details' | 'subtasks' | 'comments' | 'activity' | 'inventory' | 'consumption'
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 const STATUS_BADGE: Record<TaskStatus, { bg: string; text: string }> = {
@@ -170,6 +171,34 @@ export default function TaskDetailScreen({ route, navigation }: Props) {
   const [submittingNote, setSubmittingNote] = useState<number | null>(null)
   const [noteAttachment, setNoteAttachment] = useState<Record<number, { uri: string; name: string; type: string } | null>>({})
 
+  // Consumption approval state
+  const [consumptions, setConsumptions] = useState<ConsumptionResponse[]>([])
+  const [consumptionsLoading, setConsumptionsLoading] = useState(false)
+  const [decidingConsumptionId, setDecidingConsumptionId] = useState<number | null>(null)
+  const [consumptionNote, setConsumptionNote] = useState<Record<number, string>>({})
+
+  const loadConsumptions = useCallback(async (taskId: number) => {
+    setConsumptionsLoading(true)
+    try {
+      const data = await vendorBucketService.list(taskId)
+      setConsumptions(data)
+    } catch { /* silent */ }
+    finally { setConsumptionsLoading(false) }
+  }, [])
+
+  const decideConsumption = async (id: number, approve: boolean) => {
+    setDecidingConsumptionId(id)
+    try {
+      const note = consumptionNote[id] || undefined
+      const updated = approve
+        ? await consumptionApprovalService.approve(id, note)
+        : await consumptionApprovalService.reject(id, note)
+      setConsumptions((prev) => prev.map((c) => c.id === id ? updated : c))
+      setConsumptionNote((prev) => { const n = { ...prev }; delete n[id]; return n })
+    } catch (e: any) { showToast(e?.message || 'Action failed') }
+    finally { setDecidingConsumptionId(null) }
+  }
+
   const handlePickAttachment = async (subtaskId: number) => {
     try {
       const result = await DocumentPicker.getDocumentAsync({ copyToCacheDirectory: true, multiple: false })
@@ -265,6 +294,10 @@ export default function TaskDetailScreen({ route, navigation }: Props) {
   useEffect(() => {
     if (activeTab === 'activity') loadAudits()
   }, [activeTab, loadAudits])
+
+  useEffect(() => {
+    if (activeTab === 'consumption' && task) loadConsumptions(task.id)
+  }, [activeTab, task, loadConsumptions])
 
   // ─── Status change ─────────────────────────────────────────────────────
   const changeStatus = async (newStatus: TaskStatus) => {
@@ -921,8 +954,9 @@ export default function TaskDetailScreen({ route, navigation }: Props) {
 
         {/* ── Tabs ────────────────────────────────────────────────────── */}
         <View style={styles.tabBar}>
-          {(['details', 'subtasks', 'comments', 'activity', 'inventory'] as Tab[])
+          {(['details', 'subtasks', 'comments', 'activity', 'inventory', 'consumption'] as Tab[])
             .filter((t) => t !== 'inventory' || (permissions ? permissions.taskInventoryView : true))
+            .filter((t) => t !== 'consumption' || (currentUser?.role ?? '').toUpperCase().includes('ADMIN') || (currentUser?.role ?? '').toUpperCase() === 'EMPLOYEE')
             .map((tab) => (
               <TouchableOpacity
                 key={tab}
@@ -934,6 +968,7 @@ export default function TaskDetailScreen({ route, navigation }: Props) {
                     : tab === 'subtasks' ? `Subtasks${task.subtasksTotal > 0 ? ` (${task.subtasksCompleted}/${task.subtasksTotal})` : ''}`
                     : tab === 'comments' ? `Comments${task.commentsCount > 0 ? ` (${task.commentsCount})` : ''}`
                     : tab === 'inventory' ? 'Inventory'
+                    : tab === 'consumption' ? `Consumption${consumptions.filter(c => c.status === 'PENDING_APPROVAL').length > 0 ? ` (${consumptions.filter(c => c.status === 'PENDING_APPROVAL').length})` : ''}`
                     : 'Activity'}
                 </Text>
               </TouchableOpacity>
@@ -1314,6 +1349,65 @@ export default function TaskDetailScreen({ route, navigation }: Props) {
           {/* INVENTORY TAB */}
           {activeTab === 'inventory' && (permissions ? permissions.taskInventoryView : true) && (
             <InventorySection taskId={task.id} isAdmin={(currentUser?.role ?? '').toUpperCase().includes('ADMIN')} isSuperAdmin={(currentUser?.role ?? '').toUpperCase() === 'SUPER_ADMIN'} subtasks={task.subtasks ?? []} />
+          )}
+
+          {/* CONSUMPTION TAB */}
+          {activeTab === 'consumption' && (
+            <View style={{ padding: 16 }}>
+              {consumptionsLoading ? (
+                <ActivityIndicator color="#006a66" style={{ marginTop: 24 }} />
+              ) : consumptions.length === 0 ? (
+                <Text style={{ textAlign: 'center', color: '#9aa0a6', marginTop: 32, fontSize: 14 }}>No consumption reports submitted yet.</Text>
+              ) : (
+                consumptions.map((c) => (
+                  <View key={c.id} style={{ backgroundColor: '#fff', borderRadius: 12, padding: 14, marginBottom: 12, borderWidth: 1, borderColor: '#e8eaed' }}>
+                    <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+                      <Text style={{ fontSize: 13, fontWeight: '700', color: '#191c1e' }}>
+                        {c.submittedByUserName ?? 'Vendor'}
+                      </Text>
+                      <View style={{
+                        paddingHorizontal: 10, paddingVertical: 3, borderRadius: 20,
+                        backgroundColor: c.status === 'APPROVED' ? '#edf7ed' : c.status === 'REJECTED' ? '#ffdad6' : '#fff3e0',
+                      }}>
+                        <Text style={{ fontSize: 11, fontWeight: '700', color: c.status === 'APPROVED' ? '#166534' : c.status === 'REJECTED' ? '#ba1a1a' : '#e65100' }}>
+                          {c.status.replace('_', ' ')}
+                        </Text>
+                      </View>
+                    </View>
+                    <Text style={{ fontSize: 12, color: '#9aa0a6', marginBottom: 4 }}>
+                      Submitted {new Date(c.submittedAt).toLocaleDateString('en', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })}
+                    </Text>
+                    {c.decisionNote ? <Text style={{ fontSize: 12, color: '#44474c', fontStyle: 'italic', marginTop: 4 }}>Note: {c.decisionNote}</Text> : null}
+                    {c.status === 'PENDING_APPROVAL' && (
+                      <View style={{ marginTop: 10 }}>
+                        <TextInput
+                          style={{ borderWidth: 1, borderColor: '#e8eaed', borderRadius: 8, paddingHorizontal: 10, paddingVertical: 6, fontSize: 13, marginBottom: 8 }}
+                          placeholder="Optional decision note…"
+                          value={consumptionNote[c.id] ?? ''}
+                          onChangeText={(v) => setConsumptionNote((prev) => ({ ...prev, [c.id]: v }))}
+                        />
+                        <View style={{ flexDirection: 'row', gap: 8 }}>
+                          <TouchableOpacity
+                            style={{ flex: 1, backgroundColor: '#006a66', paddingVertical: 8, borderRadius: 8, alignItems: 'center' }}
+                            onPress={() => decideConsumption(c.id, true)}
+                            disabled={decidingConsumptionId === c.id}
+                          >
+                            {decidingConsumptionId === c.id ? <ActivityIndicator color="#fff" size="small" /> : <Text style={{ color: '#fff', fontWeight: '700', fontSize: 13 }}>✓ Approve</Text>}
+                          </TouchableOpacity>
+                          <TouchableOpacity
+                            style={{ flex: 1, backgroundColor: '#ffdad6', paddingVertical: 8, borderRadius: 8, alignItems: 'center' }}
+                            onPress={() => decideConsumption(c.id, false)}
+                            disabled={decidingConsumptionId === c.id}
+                          >
+                            <Text style={{ color: '#ba1a1a', fontWeight: '700', fontSize: 13 }}>✗ Reject</Text>
+                          </TouchableOpacity>
+                        </View>
+                      </View>
+                    )}
+                  </View>
+                ))
+              )}
+            </View>
           )}
         </ScrollView>
       </KeyboardAvoidingView>
