@@ -10,6 +10,7 @@ import { useAppDispatch, useAppSelector } from './src/store/hooks'
 import { restoreSession, logout } from './src/store/authSlice'
 import { setOnSessionExpired } from './src/services/api'
 import { registerPushToken, setupNotificationHandler, addNotificationTapListener } from './src/services/pushTokenService'
+import { pushCurrentLocation } from './src/services/locationService'
 
 function Root() {
   const dispatch = useAppDispatch()
@@ -54,6 +55,16 @@ function Root() {
     if (token) {
       registerPushToken()
     }
+  }, [token])
+
+  // Push GPS location to backend every 30s while the user is logged in.
+  // This keeps lastLatitude / lastLongitude / lastSeenAt current so the
+  // admin can see live positions on the Location page and Task Details modal.
+  useEffect(() => {
+    if (!token) return
+    pushCurrentLocation() // immediate push on login
+    const id = setInterval(pushCurrentLocation, 30_000)
+    return () => clearInterval(id)
   }, [token])
 
   // Handle notification taps (when user taps the OS notification banner)
